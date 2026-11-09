@@ -124,7 +124,7 @@ ACOES.conectarPc = () => {
     d.fechar(); await detectarConector(); irPara(S.aba);
     setTimeout(async () => { await detectarConector(); await carregarEmpresas(); irPara(S.aba); }, 5000);
   });
-  $('[data-ok]', d.el).onclick = ir; $('#cxSenha', d.el).onkeydown = (e) => e.key === 'Enter' && ir();
+  $('[data-ok]', d.el).onclick = ir; $('#cxSenha', d.el).onkeydown = (e) => { if (e.key === 'Enter') ir(); };
 };
 // pede ao conector do escritório (que pode estar em outro computador) e espera o resultado
 async function comando(tipo, dados = {}, msgEspera = 'Enviando ao conector…') {
