@@ -40,6 +40,7 @@ const I = {
   filtro: '<path d="M4 5h16l-6.5 7.5V19l-3 1.5v-8z" fill="currentColor"/>',
 };
 I.apoie = I.coracao;
+I.certs = '<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M7 8.5h6M7 12h4"/><circle cx="16.5" cy="12.5" r="2.5"/><path d="m15 15-1 5 2.5-1.3L19 20l-1-5"/>';
 I.admin = '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/>';
 const ico = (n, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
 
@@ -87,6 +88,64 @@ const aplicaPeriodo = (f) => { const p = periodo(f.per); if (p) [f.ini, f.fim] =
 const opcoes = (obj, sel) => Object.entries(obj).map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(sel) ? 'selected' : ''}>${esc(t)}</option>`).join('');
 const ACOES = {};
 document.addEventListener('click', (ev) => { const el = ev.target.closest('[data-act]'); if (el && !el.disabled && ACOES[el.dataset.act]) { ev.preventDefault(); tenta(ACOES[el.dataset.act])(el, ev); } });
+
+// ---------------- conector (programa no computador com os certificados) ----------------
+const CONECTOR = 'http://127.0.0.1:37420';
+const LINK_INSTALADOR = 'conector/Instalar-Conector-Gestius.cmd';
+async function recarregarEscritorio() {
+  const { data } = await sb.from('escritorios').select('id,nome,ativo,pc_visto_em,pc_versao,pc_host').eq('id', S.esc).maybeSingle();
+  if (data) { S.escInfo = data; const i = S.escritorios.findIndex((e) => e.id === data.id); if (i >= 0) S.escritorios[i] = data; }
+}
+async function detectarConector() {
+  try { const r = await fetch(CONECTOR + '/ponte/status', { signal: AbortSignal.timeout(2500) }); S.conector = r.ok ? await r.json() : null; }
+  catch { S.conector = null; }
+  await recarregarEscritorio().catch(() => {});
+  statusPc();
+  return S.conector;
+}
+const conectorAqui = () => !!(S.conector && S.conector.conectado && S.conector.escritorio_id === S.esc);
+async function chamarConector(caminho, opcoes = {}) {
+  const r = await fetch(CONECTOR + caminho, { ...opcoes, signal: AbortSignal.timeout(opcoes.tempo || 120000) });
+  if (!r.ok) { let j = null; try { j = await r.json(); } catch {} throw new Error((j && j.erro) || `Conector respondeu ${r.status}`); }
+  return r;
+}
+ACOES.conectarPc = () => {
+  const d = dialogo({ titulo: 'Conectar este computador', tamanho: 'sm',
+    corpo: `<p style="margin:0 0 12px">O conector deste computador vai baixar as notas com os certificados instalados aqui e enviar para o escritório <b>${esc(S.escInfo?.nome || '')}</b>.</p>
+      <div class="form" style="grid-template-columns:90px 1fr"><label>E-mail</label><input id="cxEmail" value="${esc(S.user.email)}" readonly>
+      <label>Senha</label><input id="cxSenha" type="password" autocomplete="current-password"></div>
+      <p class="dica">Confirme a sua senha do site. Ela vai só para o conector deste computador, que abre a sessão dele e não a guarda.</p>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Conectar</button>' });
+  $('#cxSenha', d.el).focus();
+  const ir = tenta(async () => {
+    const r = await chamarConector('/ponte/conectar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: S.user.email, senha: $('#cxSenha', d.el).value }) });
+    const st = await r.json();
+    if (st.escritorio_id && st.escritorio_id !== S.esc) toast(`Conectado ao escritório ${st.escritorio}.`, 'ok'); else toast('Computador conectado! Os certificados aparecem em instantes.', 'ok');
+    d.fechar(); await detectarConector(); irPara(S.aba);
+    setTimeout(async () => { await detectarConector(); await carregarEmpresas(); irPara(S.aba); }, 5000);
+  });
+  $('[data-ok]', d.el).onclick = ir; $('#cxSenha', d.el).onkeydown = (e) => e.key === 'Enter' && ir();
+};
+// pede ao conector do escritório (que pode estar em outro computador) e espera o resultado
+async function comando(tipo, dados = {}, msgEspera = 'Enviando ao conector…') {
+  const c = ok(await sb.from('comandos').insert({ escritorio_id: S.esc, tipo, dados, criado_por: S.user.id }).select('id').single());
+  if (conectorAqui()) chamarConector('/ponte/acordar', { method: 'POST', tempo: 5000 }).catch(() => {});
+  toast(msgEspera);
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 2500));
+    const x = ok(await sb.from('comandos').select('status,resultado').eq('id', c.id).single());
+    if (x.status === 'ok') return x.resultado || {};
+    if (x.status === 'erro') throw new Error((x.resultado && x.resultado.erro) || 'O conector não conseguiu executar.');
+  }
+  throw new Error('O conector não respondeu. Confira se o computador com os certificados está ligado.');
+}
+async function baixarDoConector(n, tipo) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await chamarConector(`/ponte/arquivo?doc=${n.empresa_doc}&chave=${n.chave}&tipo=${tipo}`, { headers: { Authorization: 'Bearer ' + session.access_token } });
+  const blob = await r.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; if (tipo === 'pdf') a.target = '_blank'; else a.download = n.chave + '.xml';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 
 // ---------------- login / cadastro ----------------
 function telaLogin(modo = 'login', aviso = '') {
@@ -152,6 +211,10 @@ async function iniciar() {
   montarShell();
   await carregarEmpresas();
   irPara(S.aba);
+  detectarConector().then(() => {
+    if (location.hash === '#conectar' && S.conector && !conectorAqui() && souAdmin()) { history.replaceState(null, '', location.pathname); ACOES.conectarPc(); }
+  });
+  clearInterval(S.tmCon); S.tmCon = setInterval(detectarConector, 60000);
 }
 sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') telaLogin('novasenha'); if (ev === 'SIGNED_OUT') telaLogin(); });
 
@@ -184,7 +247,8 @@ function statusPc() {
   if (!el) return;
   const min = e?.pc_visto_em ? Math.round((Date.now() - new Date(e.pc_visto_em)) / 60000) : null;
   const on = min !== null && min <= 30;
-  el.innerHTML = `<span class="agente-st ${on ? 'on' : 'off'}" title="${e?.pc_host ? 'Computador: ' + esc(e.pc_host) : ''}"><i></i>${min === null ? 'Programa do PC ainda não conectado' : on ? 'PC do escritório atualizado' : 'PC do escritório sem enviar há ' + (min < 120 ? min + ' min' : Math.round(min / 60) + ' h')}</span>`;
+  el.innerHTML = `<span class="agente-st ${on ? 'on' : 'off'}" title="${e?.pc_host ? 'Computador: ' + esc(e.pc_host) : ''}"><i></i>${min === null ? 'Conector ainda não instalado' : on ? 'Conector do escritório ativo' : 'Conector sem enviar há ' + (min < 120 ? min + ' min' : Math.round(min / 60) + ' h')}</span>`
+    + (conectorAqui() ? ' <span class="pill ok">este computador é o conector</span>' : S.conector && souAdmin() ? ' <button class="btn" style="height:24px" data-act="conectarPc">Conectar este computador</button>' : '');
 }
 async function carregarEmpresas() {
   S.empresas = ok(await sb.from('empresas').select('*').eq('escritorio_id', S.esc).order('nome'));
@@ -203,10 +267,16 @@ const souAdmin = () => S.papel === 'admin';
 
 // ---------------- empresas ----------------
 function vEmpresas() {
-  const semPc = !S.escInfo?.pc_visto_em;
-  $('#main').innerHTML = `${semPc ? `<div class="faixa">As empresas e notas chegam aqui pelo <b>programa Gestius NFS-e no computador do escritório</b>, onde ficam os certificados.
-    Lá, em Preferências → Site na internet, entre com este mesmo e-mail.</div>` : ''}
-    <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th></tr></thead><tbody>
+  const semPc = !S.escInfo?.pc_visto_em && !conectorAqui();
+  $('#main').innerHTML = `${semPc && souAdmin() ? `<div class="faixa" style="display:block;line-height:1.7">
+      <b>Falta instalar o conector</b> no computador do escritório que tem os certificados digitais (uma vez só):<br>
+      1. Nesse computador, abra este site e clique em <a class="btn ouro" style="height:26px;margin:0 4px" href="${LINK_INSTALADOR}" download>Baixar o instalador</a><br>
+      2. Abra o arquivo baixado. Se o Windows avisar, clique em <b>Mais informações → Executar assim mesmo</b>.<br>
+      3. Volte ao site e clique em <b>Conectar este computador</b> (no rodapé). Se o navegador pedir acesso à rede local, clique em <b>Permitir</b>.</div>`
+      : semPc ? '<div class="faixa">O administrador do escritório ainda não instalou o conector.</div>' : ''}
+    ${souAdmin() && !semPc ? `<div class="filtros"><button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button>
+      <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><span class="dica">Os pedidos vão para o conector do escritório e levam alguns segundos.</span></div>` : ''}
+    <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th>${souAdmin() && (S.escInfo?.pc_visto_em || conectorAqui()) ? '<th style="width:96px"></th>' : ''}</tr></thead><tbody>
     ${S.empresas.map((e) => { const d = e.cert_validade ? diasAte(e.cert_validade) : null;
       const st = e.ult_status === 'erro' ? 'erro' : e.ult_status === 'aviso' ? 'aviso' : 'ok';
       return `<tr class="${e.ativo ? '' : 'inativo'}" data-doc="${e.doc}"><td><span style="display:inline-block;min-width:150px">${fmtDoc(e.doc)}</span>${esc(e.nome)}</td>
@@ -215,7 +285,48 @@ function vEmpresas() {
       <td>${e.ult_sync ? `<span class="sinc ${st}" title="${esc(e.ult_msg || '')}">${ico(st, 'ico')} ${fmtDH(e.ult_sync)}${st === 'erro' ? ` <span class="erro-txt">${esc((e.ult_msg || '').slice(0, 70))}</span>` : ''}</span>` : '<span class="dica">nunca</span>'}</td></tr>`; }).join('')}
     </tbody></table>` : '<div class="vazio">Nenhuma empresa publicada ainda.</div>'}</div>`;
   $$('#gEmp tbody tr').forEach((tr) => (tr.ondblclick = () => { S.empresaSel = tr.dataset.doc; guardar('empresaSelWeb', S.empresaSel); carregarEmpresas(); irPara('notas'); }));
+  if (souAdmin() && !semPc) $$('#gEmp tbody tr').forEach((tr) => {
+    const e = S.empresas.find((x) => x.doc === tr.dataset.doc);
+    tr.insertAdjacentHTML('beforeend', `<td><div class="acoes"><button data-sy="${e.doc}" title="Sincronizar esta empresa">${ico('sync')}</button>
+      <button data-at="${e.doc}" title="${e.ativo ? 'Desativar' : 'Ativar'}">${ico(e.ativo ? 'erro' : 'ok')}</button><button data-ex="${e.doc}" title="Excluir">${ico('lixo')}</button></div></td>`);
+  });
+  $$('[data-sy]').forEach((b) => (b.onclick = tenta(async () => { const r = await comando('sync', { docs: [b.dataset.sy] }, 'Pedindo a sincronização…'); toast(r.enfileiradas ? 'Sincronizando. As notas novas aparecem em instantes.' : 'Já estava sincronizando.', 'ok'); atualizarDepois(); })));
+  $$('[data-at]').forEach((b) => (b.onclick = tenta(async () => { const e = S.empresas.find((x) => x.doc === b.dataset.at); await comando('ativar_empresa', { doc: e.doc, ativo: !e.ativo }); toast(e.ativo ? 'Empresa desativada.' : 'Empresa ativada.', 'ok'); atualizarDepois(3000); })));
+  $$('[data-ex]').forEach((b) => (b.onclick = () => { const e = S.empresas.find((x) => x.doc === b.dataset.ex);
+    confirmar(`Excluir ${e.nome}?`, 'A empresa e as notas dela saem do site e do conector. Os XML já gravados no computador continuam na pasta.', 'Excluir',
+      tenta(async () => { await comando('excluir_empresa', { doc: e.doc }); toast('Empresa excluída.', 'ok'); atualizarDepois(3000); })); }));
 }
+function atualizarDepois(ms = 8000) { setTimeout(async () => { await carregarEmpresas(); if (S.aba === 'empresas') vEmpresas(); }, ms); }
+ACOES.syncTodas = async () => { const r = await comando('sync', {}, 'Pedindo a sincronização…'); toast(`Sincronizando ${r.enfileiradas || 0} empresa(s).`, 'ok'); atualizarDepois(); };
+ACOES.cadastrarCerts = async () => {
+  const lista = ok(await sb.from('certificados').select('*').eq('escritorio_id', S.esc).order('titular'));
+  const cad = new Set(S.empresas.map((e) => e.doc));
+  const marcados = new Set();
+  const d = dialogo({ titulo: 'Cadastrar pelos certificados do Windows', tamanho: 'lg',
+    corpo: lista.length ? `<div class="linha" style="margin-bottom:10px"><input id="lBusca" placeholder="Procurar certificado" style="flex:1"><button class="btn" data-todas>Selecionar todas as válidas</button></div>
+      <div class="lista-certs" id="lLista"></div><p class="dica" style="margin:8px 0 0">Certificados instalados no computador do conector. Só os dados públicos (titular, CNPJ e validade) chegam ao site.</p>`
+      : '<div class="vazio">O conector ainda não enviou a lista de certificados. Ele envia ao conectar e a cada 30 minutos.</div>',
+    rodape: `<button class="btn" data-fechar>Cancelar</button>${lista.length ? '<button class="btn pri" data-cad>Cadastrar</button>' : ''}` });
+  if (!lista.length) return;
+  const desenhar = () => {
+    const q = $('#lBusca', d.el).value.trim().toLowerCase(), qd = so(q);
+    $('#lLista', d.el).innerHTML = `<table><thead><tr><th style="width:32px"></th><th>Titular</th><th>CNPJ/CPF</th><th>Validade</th><th>Emissor</th><th></th></tr></thead><tbody>
+      ${lista.filter((c) => !q || (c.titular || '').toLowerCase().includes(q) || (qd && (c.doc || '').includes(qd))).map((c) => { const off = cad.has(c.doc) || c.vencido || !c.doc;
+        return `<tr class="${off ? 'off' : ''}"><td><input type="checkbox" data-t="${esc(c.thumb)}" ${marcados.has(c.thumb) ? 'checked' : ''} ${off ? 'disabled' : ''}></td><td>${esc(c.titular)}</td><td>${fmtDoc(c.doc)}</td><td>${fmtD(c.validade)}</td><td>${esc(c.emissor || '')}</td>
+        <td>${cad.has(c.doc) ? '<span class="pill info">já cadastrada</span>' : c.vencido ? '<span class="pill vencido">vencido</span>' : ''}</td></tr>`; }).join('')}</tbody></table>`;
+    $$('[data-t]', d.el).forEach((x) => (x.onchange = () => { x.checked ? marcados.add(x.dataset.t) : marcados.delete(x.dataset.t); $('[data-cad]', d.el).textContent = marcados.size ? `Cadastrar ${marcados.size}` : 'Cadastrar'; }));
+  };
+  $('#lBusca', d.el).oninput = desenhar;
+  $('[data-todas]', d.el).onclick = () => { const vistos = new Set(); lista.filter((c) => !cad.has(c.doc) && !c.vencido && c.doc).sort((a, b) => String(b.validade).localeCompare(String(a.validade)))
+    .forEach((c) => { if (!vistos.has(c.doc)) { vistos.add(c.doc); marcados.add(c.thumb); } }); desenhar(); $('[data-cad]', d.el).textContent = `Cadastrar ${marcados.size}`; };
+  $('[data-cad]', d.el).onclick = tenta(async () => {
+    if (!marcados.size) throw new Error('Selecione pelo menos um certificado.');
+    d.fechar();
+    const r = await comando('cadastrar', { thumbs: [...marcados] }, 'Cadastrando no conector…');
+    toast(`${r.criadas || 0} empresa(s) cadastrada(s). Baixando as notas…`, 'ok'); atualizarDepois(6000); atualizarDepois(30000);
+  });
+  desenhar();
+};
 
 // ---------------- notas ----------------
 function vNotas() {
@@ -268,11 +379,12 @@ function desenharNotas() {
   const tipo = S.fN.tipo, cols = COLN.filter((c) => !c[3] || tipo === 'todas' || c[3] === tipo);
   const { c: oc, d: od } = S.ordN;
   const linhas = [...N.linhas].sort((a, b) => { const x = a[oc] ?? '', y = b[oc] ?? ''; return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true })) * od; });
-  g.innerHTML = linhas.length ? `<table><thead><tr>${cols.map(([k, t, , , cl]) => `<th data-ord="${k}" class="${cl || ''}">${t}${oc === k ? `<span class="ord">${od > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead>
-    <tbody>${linhas.map((n) => `<tr data-i="${N.linhas.indexOf(n)}">${cols.map(([, , fn, , cl]) => `<td class="${cl || ''}">${fn(n)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+  g.innerHTML = linhas.length ? `<table><thead><tr>${cols.map(([k, t, , , cl]) => `<th data-ord="${k}" class="${cl || ''}">${t}${oc === k ? `<span class="ord">${od > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}${conectorAqui() ? '<th class="cen" style="width:76px">PDF/XML</th>' : ''}</tr></thead>
+    <tbody>${linhas.map((n) => `<tr data-i="${N.linhas.indexOf(n)}">${cols.map(([, , fn, , cl]) => `<td class="${cl || ''}">${fn(n)}</td>`).join('')}${conectorAqui() ? `<td><div class="docbtns"><button data-pdf title="DANFSe (PDF)">${ico('pdf')}</button><button data-xml title="Baixar XML">${ico('xml')}</button></div></td>` : ''}</tr>`).join('')}</tbody></table>`
     : `<div class="vazio">${S.empresas.length ? 'Nenhuma nota no período.' : 'Nenhuma empresa publicada ainda pelo programa do PC.'}</div>`;
   $$('th[data-ord]', g).forEach((th) => (th.onclick = () => { const k = th.dataset.ord; S.ordN = { c: k, d: S.ordN.c === k ? -S.ordN.d : 1 }; guardar('ordN', S.ordN); desenharNotas(); }));
-  $$('tbody tr', g).forEach((tr) => { tr.onclick = () => $$('tbody tr', g).forEach((x) => x.classList.toggle('sel', x === tr)); tr.ondblclick = () => detalheNota(N.linhas[tr.dataset.i]); });
+  $$('tbody tr', g).forEach((tr) => { tr.onclick = (ev) => { if (ev.target.closest('.docbtns')) return; $$('tbody tr', g).forEach((x) => x.classList.toggle('sel', x === tr)); }; tr.ondblclick = (ev) => { if (!ev.target.closest('.docbtns')) detalheNota(N.linhas[tr.dataset.i]); }; });
+  $$('[data-pdf],[data-xml]', g).forEach((b) => (b.onclick = tenta(async () => { const n = N.linhas[b.closest('tr').dataset.i]; await baixarDoConector(n, b.hasAttribute('data-pdf') ? 'pdf' : 'xml'); })));
   const t = N.totais;
   $('#nCont').textContent = `${t.total.toLocaleString('pt-BR')} registro(s) · ${t.empresas} empresa(s)${t.total > N.linhas.length ? ` · mostrando ${N.linhas.length}` : ''}`;
   const bloco = (titulo, pares, total) => `<fieldset><legend>${titulo}</legend><dl>${pares.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}${total !== undefined ? `<dt class="tot">Total</dt><dd class="tot">${total}</dd>` : ''}</dl></fieldset>`;
@@ -289,7 +401,8 @@ function detalheNota(n) {
   const kv = (pares) => '<dl class="kv">' + pares.filter((x) => x[1] !== '' && x[1] != null).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>';
   const emp = S.empresas.find((e) => e.doc === n.empresa_doc);
   p.innerHTML = `<div class="dlg-hd"><b>NFS-e ${esc(n.numero)} · ${n.tipo}</b><button class="x">×</button></div><div class="dlg-bd">
-    <div class="faixa" style="margin-bottom:12px">O XML e o PDF desta nota ficam no computador do escritório (programa Gestius NFS-e).</div>
+    ${conectorAqui() ? `<div class="linha" style="margin-bottom:12px"><button class="btn" data-dpdf>${ico('pdf')} DANFSe</button><button class="btn" data-dxml>${ico('xml')} XML</button></div>`
+      : '<div class="faixa" style="margin-bottom:12px">O XML e o PDF desta nota ficam no computador do conector do escritório: abra o site nele para baixar.</div>'}
     <h3>Identificação</h3>${kv([['Empresa', esc(emp?.nome || n.empresa_doc)], ['Situação', `<span class="pill ${n.situacao}">${SITN[n.situacao]}</span>`], ['Chave de acesso', `<span class="mono">${esc(n.chave)}</span>`], ['Geração', fmtDH(n.dh_proc)], ['Emissão da DPS', fmtDH(n.dh_emi)], ['Competência', fmtD(n.d_compet)], ['Série / DPS', [n.serie, n.n_dps].filter(Boolean).join(' / ')], ['Município', esc(n.municipio)]])}
     <h3>Partes</h3>${kv([['Prestador', `${fmtDoc(n.prest_doc)} - ${esc(n.prest_nome)}`], ['Tomador', `${fmtDoc(n.toma_doc)} - ${esc(n.toma_nome)}`]])}
     <h3>Serviço</h3>${kv([['Cód. trib. nacional', esc(n.cod_trib)], ['Descrição do código', esc(n.x_trib_nac)], ['NBS', esc(n.c_nbs)], ['Descrição', esc(n.descricao)]])}
@@ -301,6 +414,7 @@ function detalheNota(n) {
   const fechar = () => { ov.remove(); p.remove(); document.removeEventListener('keydown', tecla); };
   const tecla = (e) => e.key === 'Escape' && fechar();
   ov.onclick = fechar; $('.x', p).onclick = fechar; document.addEventListener('keydown', tecla);
+  $('[data-dpdf]', p)?.addEventListener('click', tenta(() => baixarDoConector(n, 'pdf'))); $('[data-dxml]', p)?.addEventListener('click', tenta(() => baixarDoConector(n, 'xml')));
   sb.from('eventos').select('*').eq('escritorio_id', S.esc).eq('chave_nfse', n.chave).order('nsu').then(({ data }) => {
     $('#dEv', p).innerHTML = data && data.length ? `<table class="hist">${data.map((e) => `<tr><td>${fmtDH(e.dh_evento)}</td><td>${esc(e.descricao)}<div class="dica">${esc(e.motivo || '')}</div></td></tr>`).join('')}</table>` : '<span class="dica">Nenhum evento.</span>';
   });
