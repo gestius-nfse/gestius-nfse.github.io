@@ -276,3 +276,29 @@ body{font-family:Poppins,"Segoe UI",system-ui,sans-serif;font-size:12.5px}
 .apoie-card h2{font-family:var(--tit);color:var(--navy)}
 @media (max-width:1000px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.marca{display:none}}
 .login input[type=checkbox]{height:16px;width:16px;flex:none}
+
+/* ---------- 3.4: cadastro, convites, perfil ---------- */
+.login{overflow:auto;padding:24px 0}
+.login .caixa{width:min(420px,94vw)}
+.login .seg{display:grid;grid-template-columns:1fr 1fr;background:#f1f2f5;border-radius:6px;padding:3px;margin:0 0 14px;gap:3px}
+.login .seg button{border:0;background:none;border-radius:4px;height:32px;cursor:pointer;color:var(--muted);font-weight:600;font-size:12.5px}
+.login .seg button.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.senha-campo{position:relative;display:block}
+.senha-campo input{width:100%;padding-right:40px}
+.senha-campo .olho{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;width:32px;height:30px;cursor:pointer;color:var(--muted2);display:grid;place-items:center}
+.senha-campo .olho svg{width:18px;height:18px}
+.senha-campo .olho.on{color:var(--navy)}
+.forca{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:10px;margin:-6px 0 12px;font-size:11.5px;color:var(--muted)}
+.forca i{height:5px;border-radius:3px;background:#e4e6eb;position:relative;overflow:hidden}
+.forca i::after{content:"";position:absolute;inset:0;width:0;transition:width .2s,background .2s}
+.forca[data-n="1"] i::after{width:33%;background:#d9534f}
+.forca[data-n="2"] i::after{width:66%;background:#e0a526}
+.forca[data-n="3"] i::after{width:100%;background:#2e9a52}
+.faixa.ok-faixa{background:#e9f6ee;border-color:#a9d8b8;color:#1d6b3a}
+.login .btn:disabled{opacity:.7;cursor:wait}
+a.tel{color:#1d7a46;text-decoration:none;font-weight:600}
+a.tel::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#25d366;margin-right:6px;vertical-align:1px}
+a.tel:hover{text-decoration:underline}
+textarea{border:1px solid var(--line);border-radius:4px;padding:8px;resize:vertical;font-size:12.5px}
+@media (max-width:560px){.login .caixa{padding:22px 18px}}
+a.btn{text-decoration:none}
