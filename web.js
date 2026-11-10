@@ -345,7 +345,7 @@ function vEmpresas() {
           ${conectorAqui() ? `Clique em <a class="btn ouro" style="height:26px;margin:0 4px" href="${LINK_INSTALADOR}" download>Atualizar o conector</a>, abra o arquivo baixado e depois clique em <b>Conectar este computador</b>. É a última vez: a partir dessa versão ele se atualiza sozinho.` : 'No computador que tem os certificados, abra este site e clique em "Atualizar o conector".'}</div>` : ''}
     ${!semPc ? `<div class="filtros">${podeOperar() ? `<button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button>` : ''}
       <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><button class="btn" data-act="prefsConector">${ico('pasta')} Preferências</button>
-      ${conectorAqui() ? `<button class="btn" data-act="abrirPasta">${ico('pasta')} Abrir pasta dos XML</button>` : ''}<span class="dica">Os pedidos vão para o conector do escritório e levam alguns segundos.</span></div>` : ''}
+      ${conectorAqui() ? `<button class="btn" data-act="abrirPasta">${ico('pasta')} Abrir pasta dos XML</button>` : ''}<span class="dica">A sincronização baixa todas as notas que o Ambiente Nacional tem para cada empresa, de qualquer período (os filtros só mudam o que aparece na tela).</span></div>` : ''}
     <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th>${podeOperar() && (S.escInfo?.pc_visto_em || conectorAqui()) ? '<th style="width:130px"></th>' : ''}</tr></thead><tbody>
     ${S.empresas.map((e) => { const d = e.cert_validade ? diasAte(e.cert_validade) : null;
       const st = e.ult_status === 'erro' ? 'erro' : e.ult_status === 'aviso' ? 'aviso' : 'ok';
@@ -803,6 +803,8 @@ function menuEmpresa(ev, e) {
   const aqui = conectorAqui();
   menuContexto(ev, [
     { t: 'Sincronizar só esta empresa', ico: 'sync', fn: async () => { const r = await comando('sync', { docs: [e.doc] }, 'Pedindo a sincronização…'); toast(r.enfileiradas ? 'Sincronizando. As notas novas aparecem em instantes.' : 'Já estava sincronizando.', 'ok'); atualizarDepois(); } },
+    { t: 'Baixar tudo de novo desde o início', fn: () => confirmar(`Baixar tudo de novo: ${e.nome}?`, 'O conector pede ao Ambiente Nacional todos os documentos da empresa desde o primeiro (NSU 0), de qualquer período. As notas que já estão gravadas não se repetem; o que faltar é completado. Pode levar alguns minutos.', 'Baixar tudo',
+      tenta(async () => { await comando('sync', { docs: [e.doc], desdeInicio: true }, 'Pedindo o download completo…'); toast('Baixando todos os documentos desde o início. As notas que faltarem aparecem em instantes.', 'ok'); atualizarDepois(15000); })) },
     { t: 'Ver notas desta empresa', ico: 'notas', fn: () => { S.empresaSel = e.doc; guardar('empresaSelWeb', S.empresaSel); carregarEmpresas(); irPara('notas'); } },
     { t: 'Abrir pasta da empresa', ico: 'pasta', off: !aqui, dica: aqui ? '' : 'Só no computador do conector', fn: () => abrirPastaConector(e.doc) },
     { t: 'Histórico desta empresa', fn: () => ACOES.historico(e.doc) }, '-',
