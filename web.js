@@ -140,8 +140,10 @@ const CONECTOR_MIN = '3.6.0';
 const versaoMaior = (a, b) => { const x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 const conectorDesatualizado = (v) => !!v && versaoMaior(CONECTOR_MIN, v);
 const versaoConector = () => (conectorAqui() ? S.conector?.versao : S.cfgConector?.versao) || '';
-function exigirConectorNovo() {
+function exigirConectorNovo(min = CONECTOR_MIN) {
   const v = versaoConector();
+  if (v && !versaoMaior(min, v) && !conectorDesatualizado(v)) return;
+  if (v && !conectorDesatualizado(v)) throw new Error(`Esta função precisa do conector ${min} (o do escritório está na ${v}). Clique em Preferências → Conector → "Procurar atualização agora" e tente de novo em 1 minuto.`);
   if (!v || conectorDesatualizado(v)) throw new Error(`O conector do escritório está desatualizado${v ? ` (versão ${v})` : ''}. No computador dos certificados, abra este site e clique em "Atualizar o conector" (aba Empresas). Depois disso ele se atualiza sozinho.`);
 }
 async function comando(tipo, dados = {}, msgEspera = 'Enviando ao conector…') {
@@ -284,8 +286,18 @@ async function iniciar() {
 }
 sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') telaLogin('novasenha'); if (ev === 'SIGNED_OUT') telaLogin(); });
 
-const abas = () => [['empresas', 'Empresas'], ['notas', 'Emitidas / Recebidas'], ['eventos', 'Eventos'], ['conferir', 'Conferir'], ['alteracoes', 'Alterações'], ['usuarios', 'Usuários'], ['apoie', 'Apoie'],
+const TODAS_ABAS = () => [['empresas', 'Empresas'], ['notas', 'Emitidas / Recebidas'], ['eventos', 'Eventos'], ['conferir', 'Conferir'], ['alteracoes', 'Alterações'], ['usuarios', 'Usuários'], ['apoie', 'Apoie'],
   ...(S.superu ? [['admin', 'Administração']] : [])];
+const ABAS_FIXAS = ['empresas', 'notas', 'admin'];
+const abas = () => { const oc = guardado('abasOcultas', []) || []; return TODAS_ABAS().filter(([k]) => ABAS_FIXAS.includes(k) || !oc.includes(k)); };
+ACOES.abasVisiveis = () => {
+  const oc = guardado('abasOcultas', []) || [];
+  const d = dialogo({ titulo: 'Abas', tamanho: 'sm', corpo: `<p class="dica" style="margin:0 0 8px">Esconda as abas que você não usa (vale só neste navegador).</p>${TODAS_ABAS().map(([k, t]) =>
+    `<label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" data-ab="${k}" ${!oc.includes(k) ? 'checked' : ''} ${ABAS_FIXAS.includes(k) ? 'disabled' : ''}> ${t}</label>`).join('')}`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>OK</button>' });
+  $('[data-ok]', d.el).onclick = () => { guardar('abasOcultas', $$('[data-ab]', d.el).filter((x) => !x.checked).map((x) => x.dataset.ab)); d.fechar();
+    const aba = abas().some(([k]) => k === S.aba) ? S.aba : 'empresas'; montarShell(); irPara(aba); };
+};
 function montarShell() {
   const nome = S.membros.find((m) => m.escritorio_id === S.esc)?.nome || S.user.email;
   const ini = nome.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
@@ -343,7 +355,7 @@ function vEmpresas() {
       : semPc ? '<div class="faixa">O conector ainda não foi instalado no computador do escritório que tem os certificados.</div>'
       : conectorDesatualizado(versaoConector()) ? `<div class="faixa" style="display:block;line-height:1.7"><b>O conector ${conectorAqui() ? 'deste computador' : 'do escritório'} está desatualizado (versão ${esc(versaoConector())}).</b> Pasta dos XML, Preferências, Zip e DANFSe em lote precisam da versão ${CONECTOR_MIN}.<br>
           ${conectorAqui() ? `Clique em <a class="btn ouro" style="height:26px;margin:0 4px" href="${LINK_INSTALADOR}" download>Atualizar o conector</a>, abra o arquivo baixado e depois clique em <b>Conectar este computador</b>. É a última vez: a partir dessa versão ele se atualiza sozinho.` : 'No computador que tem os certificados, abra este site e clique em "Atualizar o conector".'}</div>` : ''}
-    ${!semPc ? `<div class="filtros">${podeOperar() ? `<button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button>` : ''}
+    ${!semPc ? `<div class="filtros">${podeOperar() ? `<button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button><button class="btn" data-act="cadastrarProcuracao">Cadastrar por procuração</button><button class="btn" data-act="trocarCertLote">Trocar certificado em lote</button>` : ''}
       <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><button class="btn" data-act="prefsConector">${ico('pasta')} Preferências</button>
       ${conectorAqui() ? `<button class="btn" data-act="abrirPasta">${ico('pasta')} Abrir pasta dos XML</button>` : ''}<span class="dica">A sincronização baixa todas as notas que o Ambiente Nacional tem para cada empresa, de qualquer período (os filtros só mudam o que aparece na tela).</span></div>` : ''}
     <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th>${podeOperar() && (S.escInfo?.pc_visto_em || conectorAqui()) ? '<th style="width:130px"></th>' : ''}</tr></thead><tbody>
@@ -378,7 +390,8 @@ async function abrirPastaConector(doc) {
   const j = await r.json(); toast(`Pasta aberta: ${j.pasta}`, 'ok');
 }
 ACOES.abrirPasta = () => abrirPastaConector('');
-const SUBPASTAS = { 'empresa/ano/mes/tipo': 'Empresa / AAAA / MM / Tipo', 'empresa/tipo/ano/mes': 'Empresa / Tipo / AAAA / MM', 'empresa/ano/mes': 'Empresa / AAAA / MM', 'empresa/tipo': 'Empresa / Tipo' };
+const SUBPASTAS = { 'empresa/ano/mes/tipo': 'Empresa / AAAA / MM / Tipo', 'empresa/aaaamm/tipo': 'Empresa / AAAAMM / Tipo', 'empresa/aaaamm': 'Empresa / AAAAMM', 'empresa/mmaaaa/tipo': 'Empresa / MMAAAA / Tipo', 'empresa/mmaaaa': 'Empresa / MMAAAA (rotina da Domínio)',
+  'empresa/tipo/ano/mes': 'Empresa / Tipo / AAAA / MM', 'empresa/tipo/aaaa/mmaa': 'Empresa / Tipo / AAAA / MMAA', 'empresa/ano/mes': 'Empresa / AAAA / MM', 'empresa/tipo': 'Empresa / Tipo' };
 const FREQ = { 0: 'Só quando pedir', 30: 'A cada 30 minutos', 60: 'A cada 1 hora', 120: 'A cada 2 horas', 240: 'A cada 4 horas', diario: 'Uma vez por dia' };
 async function carregarCfgConector() {
   const { data } = await sb.from('conector_config').select('cfg,atualizado_em').eq('escritorio_id', S.esc).maybeSingle();
@@ -426,7 +439,7 @@ ACOES.prefsConector = async (secao) => {
   const ex = () => {
     const sep = /^[a-zA-Z]:|^\\\\/.test($('#pcPasta', d.el).value) ? '\\' : '/', base = $('#pcPasta', d.el).value.replace(/[\\/]+$/, '');
     const am = $('input[name=pcAm]:checked', d.el).value === 'geracao' ? ['2026', '10'] : ['2026', '09'];
-    const caminho = (tipo, ano, mes) => $('#pcSub', d.el).value.split('/').slice(1).map((x) => ({ ano, mes, tipo })[x]).join(sep);
+    const caminho = (tipo, ano, mes) => $('#pcSub', d.el).value.split('/').slice(1).map((x) => ({ ano, mes, tipo, aaaamm: ano + mes, mmaaaa: mes + ano, aaaa: ano, mmaa: mes + ano.slice(2) })[x]).join(sep);
     $('#pcEx', d.el).textContent = [`${base}${sep}EMPRESA LTDA${sep}${caminho($('#pcEm', d.el).value, ...am)}${sep}42054001…000001230.xml`,
       `${base}${sep}EMPRESA LTDA${sep}${caminho($('#pcRe', d.el).value, ...am)}${sep}42054001…000000770.xml`, `${base}${sep}EMPRESA LTDA${sep}${caminho($('#pcEv', d.el).value, '2026', '10')}${sep}42054001…101101001.xml`].join('\n');
     $('#pcHora', d.el).disabled = $('#pcFreq', d.el).value !== 'diario';
@@ -476,6 +489,89 @@ ACOES.cadastrarCerts = async () => {
   desenhar();
 };
 
+// ---- Editar empresa / procuração / certificado em lote (como no programa do PC) ----
+const opcoesCert = (lista, sel, auto = true) => `${auto ? `<option value="">Automático (o certificado válido mais novo do próprio CNPJ/CPF)</option>` : ''}${lista.filter((c) => !c.vencido)
+  .map((c) => `<option value="${esc(c.thumb)}" ${c.thumb === sel ? 'selected' : ''}>${esc(c.titular)} · ${fmtDoc(c.doc)} · vence ${fmtD(c.validade)}</option>`).join('')}`;
+const listarCerts = async () => ok(await sb.from('certificados').select('*').eq('escritorio_id', S.esc).order('titular'));
+ACOES.editarEmpresa = async (doc) => {
+  exigirConectorNovo('3.7.0');
+  const [r, certs] = await Promise.all([comando('ler_empresas', {}, 'Lendo o cadastro no conector…'), listarCerts()]);
+  const e = (r.empresas || []).find((x) => x.doc === doc); if (!e) throw new Error('Empresa não encontrada no conector.');
+  const d = dialogo({ titulo: 'Editar empresa', tamanho: 'lg', corpo: `<div class="form2">
+    <label>CNPJ/CPF<input value="${fmtDoc(e.doc)}" disabled></label>
+    <label>Nome<input id="eNome" maxlength="150" value="${esc(e.nome)}"></label>
+    <label>Certificado usado para baixar<select id="eCert">${opcoesCert(certs, e.cert_auto ? '' : e.cert_thumb)}</select></label>
+    <p class="dica" style="margin:-4px 0 6px">Para empresas sem certificado próprio, escolha o certificado do contador com procuração no e-CAC (ou o do representante legal). Hoje: ${esc(e.cert_titular || '—')}${e.cert_validade ? ` · vence ${fmtD(e.cert_validade)}` : ''}.</p>
+    <div class="linha"><button class="btn" data-testar>Testar acesso ao Ambiente Nacional</button><span id="eTeste" class="dica"></span></div>
+    <label style="margin-top:10px">Pasta dos XML desta empresa</label>
+    <div class="linha"><label class="chk"><input type="radio" name="ePasta" value="padrao" ${e.pasta_xml ? '' : 'checked'}> Padrão</label><label class="chk"><input type="radio" name="ePasta" value="outro" ${e.pasta_xml ? 'checked' : ''}> Outro lugar</label>
+      <input id="ePastaX" style="flex:1" placeholder="D:\\Clientes\\Empresa" value="${esc(e.pasta_xml)}"></div>
+    <p class="dica" style="margin:4px 0 8px">Gravando hoje em: <code>${esc(e.pasta_efetiva || '')}</code></p>
+    <label>Último NSU baixado<div class="linha"><input id="eNsu" type="number" min="0" value="${Number(e.ult_nsu) || 0}" style="width:160px"><button class="btn" data-zerar>Zerar (baixar tudo de novo)</button></div></label>
+    <p class="dica" style="margin:4px 0 0">A próxima sincronização continua a partir deste número. Com 0, o conector pede ao Ambiente Nacional todos os documentos desde o início.</p></div>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-salvar>Salvar</button>' });
+  const pastaX = $('#ePastaX', d.el), sincPasta = () => (pastaX.disabled = $('input[name=ePasta]:checked', d.el).value !== 'outro');
+  $$('input[name=ePasta]', d.el).forEach((x) => (x.onchange = sincPasta)); sincPasta();
+  $('[data-zerar]', d.el).onclick = () => ($('#eNsu', d.el).value = 0);
+  $('[data-testar]', d.el).onclick = tenta(async () => {
+    const out = $('#eTeste', d.el); out.textContent = 'Testando…';
+    if (($('#eCert', d.el).value || '') !== (e.cert_auto ? '' : e.cert_thumb)) await comando('editar_empresa', { doc, cert_thumb: $('#eCert', d.el).value }, 'Trocando o certificado…');
+    const t = await comando('testar_empresa', { doc }, 'Testando o acesso…');
+    out.innerHTML = t.ok ? `<span style="color:var(--ok)">${ico('ok')} Acesso liberado${t.cert ? ` com o certificado de ${esc(t.cert.titular)}` : ''}.</span>` : `<span class="erro-txt">${ico('erro')} ${esc(t.erro || 'Sem acesso.')}</span>`;
+  });
+  $('[data-salvar]', d.el).onclick = tenta(async () => {
+    const outro = $('input[name=ePasta]:checked', d.el).value === 'outro', pasta = outro ? pastaX.value.trim() : '';
+    if (outro && !pasta) throw new Error('Informe a pasta ou escolha "Padrão".');
+    const dados = { doc, nome: $('#eNome', d.el).value.trim(), cert_thumb: $('#eCert', d.el).value };
+    if (pasta !== (e.pasta_xml || '')) dados.pasta_xml = pasta;
+    const nsu = Math.max(0, parseInt($('#eNsu', d.el).value, 10) || 0); if (nsu !== Number(e.ult_nsu)) dados.nsu = nsu;
+    await comando('editar_empresa', dados, 'Salvando no conector…'); d.fechar(); toast('Empresa atualizada.', 'ok'); atualizarDepois(3000);
+  });
+};
+ACOES.cadastrarProcuracao = async () => {
+  exigirConectorNovo('3.7.0');
+  const certs = (await listarCerts()).filter((c) => !c.vencido);
+  if (!certs.length) throw new Error('O conector ainda não enviou a lista de certificados válidos.');
+  const d = dialogo({ titulo: 'Cadastrar por procuração (certificado do contador)', tamanho: 'lg', corpo: `<div class="form2">
+    <label>Certificado que vai baixar as notas<select id="pCert">${opcoesCert(certs, '', false)}</select></label>
+    <p class="dica" style="margin:-4px 0 8px">Use o e-CNPJ/e-CPF do contador que tem procuração no e-CAC para cada empresa (serviço de NFS-e), ou o do representante legal.</p>
+    <label>Empresas (uma por linha: <code>CNPJ ou CPF;Nome;Pasta</code> — nome e pasta são opcionais)<textarea id="pLinhas" rows="9" placeholder="12.345.678/0001-90;Padaria Exemplo Ltda&#10;98765432000110;;D:\\Clientes\\Outra"></textarea></label>
+    <p class="dica" style="margin:4px 0 0">Pode colar direto de uma planilha (colunas CNPJ, Nome, Pasta). Sem nome, o conector busca a razão social na Receita. <a href="#" data-modelo>Baixar planilha modelo</a></p>
+    <div id="pPrev" class="dica" style="margin-top:6px"></div></div>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-cad>Cadastrar</button>' });
+  const ler = () => $('#pLinhas', d.el).value.split(/\r?\n/).map((l) => l.split(/[;\t]/).map((x) => x.trim())).filter((x) => so(x[0]))
+    .map(([doc, nome = '', pasta = '']) => ({ doc: so(doc), nome, pasta }));
+  const validos = (l) => l.filter((x) => x.doc.length === 14 || x.doc.length === 11);
+  $('#pLinhas', d.el).oninput = () => { const l = ler(), v = validos(l), cad = new Set(S.empresas.map((e) => e.doc));
+    $('#pPrev', d.el).textContent = l.length ? `${v.length} válida(s)${l.length - v.length ? ` · ${l.length - v.length} inválida(s)` : ''}${v.filter((x) => cad.has(x.doc)).length ? ` · ${v.filter((x) => cad.has(x.doc)).length} já cadastrada(s)` : ''}` : ''; };
+  $('[data-modelo]', d.el).onclick = (ev) => { ev.preventDefault(); salvarArquivo(window.gerarXlsx({ abas: [{ aba: 'Empresas', colunas: [{ titulo: 'CNPJ ou CPF', largura: 20 }, { titulo: 'Nome (opcional)', largura: 45 }, { titulo: 'Pasta (opcional)', largura: 40 }], linhas: [['12.345.678/0001-90', 'Empresa Exemplo Ltda', '']] }] }), 'modelo-procuracao.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); };
+  $('[data-cad]', d.el).onclick = tenta(async () => {
+    const itens = validos(ler()); if (!itens.length) throw new Error('Cole pelo menos um CNPJ ou CPF válido.');
+    d.fechar(); const r = await comando('cadastrar_doc', { itens, cert_thumb: $('#pCert', d.el).value }, 'Cadastrando no conector…');
+    toast(`${r.criadas || 0} empresa(s) cadastrada(s)${r.ignoradas ? `, ${r.ignoradas} já existia(m)` : ''}. Baixando as notas…`, 'ok'); atualizarDepois(6000); atualizarDepois(30000);
+  });
+};
+ACOES.trocarCertLote = async () => {
+  exigirConectorNovo('3.7.0');
+  const certs = (await listarCerts()).filter((c) => !c.vencido), marcadas = new Set();
+  const d = dialogo({ titulo: 'Trocar certificado em lote', tamanho: 'lg', corpo: `<div class="form2">
+    <label>Usar este certificado<select id="tCert">${opcoesCert(certs, '')}</select></label>
+    <div class="linha" style="margin:6px 0"><input id="tBusca" placeholder="Procurar empresa" style="flex:1"><button class="btn" data-todas>Marcar todas</button></div>
+    <div class="lista-certs" id="tLista"></div></div>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Trocar</button>' });
+  const desenhar = () => { const q = $('#tBusca', d.el).value.trim().toLowerCase(), qd = so(q);
+    $('#tLista', d.el).innerHTML = `<table><tbody>${S.empresas.filter((e) => !q || e.nome.toLowerCase().includes(q) || (qd && e.doc.includes(qd))).map((e) =>
+      `<tr><td style="width:32px"><input type="checkbox" data-d="${e.doc}" ${marcadas.has(e.doc) ? 'checked' : ''}></td><td>${fmtDoc(e.doc)}</td><td>${esc(e.nome)}</td></tr>`).join('')}</tbody></table>`;
+    $$('[data-d]', d.el).forEach((x) => (x.onchange = () => (x.checked ? marcadas.add(x.dataset.d) : marcadas.delete(x.dataset.d)))); };
+  $('#tBusca', d.el).oninput = desenhar; $('[data-todas]', d.el).onclick = () => { S.empresas.forEach((e) => marcadas.add(e.doc)); desenhar(); }; desenhar();
+  $('[data-ok]', d.el).onclick = tenta(async () => {
+    if (!marcadas.size) throw new Error('Marque pelo menos uma empresa.');
+    const t = $('#tCert', d.el).value; d.fechar(); let n = 0;
+    for (const doc of marcadas) { await comando('editar_empresa', { doc, cert_thumb: t }, `Trocando o certificado (${++n}/${marcadas.size})…`); }
+    toast(`Certificado trocado em ${n} empresa(s).`, 'ok'); atualizarDepois(3000);
+  });
+};
+
 // ---------------- notas ----------------
 function vNotas() {
   const f = S.fN;
@@ -489,9 +585,9 @@ function vNotas() {
     </div>
     <div class="filtros">
       <select id="nSit">${opcoes({ '': 'Todas as situações', regular: 'Regular', cancelada: 'Cancelada', substituida: 'Substituída' }, f.sit)}</select>
-      <select id="nRet">${opcoes({ '': 'Com e sem ret., desc. e ded.', com: 'Com retenção, desconto ou dedução', sem: 'Sem retenção, desconto ou dedução' }, f.ret)}</select>
+      <select id="nRet">${opcoes(FILTRO_RET, f.ret)}</select>
       <select id="nReg">${opcoes({ '': 'Todos os regimes', 1: 'Não optante', 2: 'Optante - MEI', 3: 'Optante - ME/EPP' }, f.regime)}</select>
-      <input class="busca" id="nQ" placeholder="Procurar por número, nome, CNPJ, chave de acesso ou descrição do serviço" value="${esc(f.q)}">
+      <input class="busca" id="nQ" placeholder="Procurar por número, nome, CNPJ, chave, descrição, código do serviço (010701, 01.07.01, 1.07) ou NBS" value="${esc(f.q)}">
       <button class="btn pri" id="nFiltrar">${ico('filtro')} Filtrar</button><button class="btn" id="nLimpar">Limpar</button><button class="btn" data-act="colunasN" style="margin-left:auto">${ico('colunas')} Colunas</button>
     </div>
     <div class="grade" id="gN"><div class="vazio">Carregando…</div></div>
@@ -525,18 +621,31 @@ const COLN = [
   // colunas opcionais (botão "Colunas")
   ['cod_trib', 'cTribNac', (n) => esc(n.cod_trib || ''), null, '', true], ['c_nbs', 'NBS', (n) => esc(n.c_nbs || ''), null, '', true],
   ['v_liq', 'Valor líquido (R$)', (n) => brl(n.v_liq), null, 'num', true], ['v_total_ret', 'Total retido (R$)', (n) => brl(n.v_total_ret), null, 'num', true],
-  ['v_ret_irrf', 'IRRF (R$)', (n) => brl(n.v_ret_irrf), null, 'num', true], ['v_ret_csll', 'CSLL (R$)', (n) => brl(n.v_ret_csll), null, 'num', true],
+  ['v_ret_irrf', 'IRRF (R$)', (n) => brl(n.v_ret_irrf), null, 'num', true], ['v_ret_csll', 'vRetCSLL (PIS+COFINS+CSLL retidos)', (n) => brl(n.v_ret_csll), null, 'num', true],
   ['v_ret_cp', 'INSS/CP (R$)', (n) => brl(n.v_ret_cp), null, 'num', true], ['v_pis', 'PIS (R$)', (n) => brl(n.v_pis), null, 'num', true], ['v_cofins', 'COFINS (R$)', (n) => brl(n.v_cofins), null, 'num', true],
+  ['v_desc_incond', 'vDescIncond (R$)', (n) => brl(n.v_desc_incond), null, 'num', true], ['v_desc_cond', 'vDescCond (R$)', (n) => brl(n.v_desc_cond), null, 'num', true],
+  ['v_dr', 'vDR (R$)', (n) => brl(n.v_dr), null, 'num', true], ['municipio', 'Município', (n) => esc(n.municipio || ''), null, '', true],
   ['v_cbs', 'CBS (R$)', (n) => brl(n.v_cbs), null, 'num', true], ['v_ibs_mun', 'IBS Mun. (R$)', (n) => brl((n.v_ibs_mun || 0)), null, 'num', true],
   ['p_aliq', 'Alíq. ISS', (n) => (n.p_aliq ? esc(String(n.p_aliq).replace('.', ',')) + '%' : ''), null, 'num', true], ['chave', 'Chave de acesso', (n) => `<span class="mono" style="font-size:11px">${esc(n.chave)}</span>`, null, '', true],
 ];
-const colsVisiveis = () => { const v = guardado('colsN', null); return COLN.filter((c) => (v ? v.includes(c[0]) : !c[5])); };
+const ordemCols = () => { const o = guardado('ordemColsN', null) || []; const pos = (k) => { const i = o.indexOf(k); return i < 0 ? 1000 + COLN.findIndex((c) => c[0] === k) : i; };
+  return [...COLN].sort((a, b) => pos(a[0]) - pos(b[0])); };
+const colsVisiveis = () => { const v = guardado('colsN', null); return ordemCols().filter((c) => (v ? v.includes(c[0]) : !c[5])); };
 ACOES.colunasN = () => {
   const vis = colsVisiveis().map((c) => c[0]);
-  const d = dialogo({ titulo: 'Colunas', tamanho: 'sm', corpo: `<div class="cols-lista">${COLN.map((c) => `<label class="chk"><input type="checkbox" data-col="${c[0]}" ${vis.includes(c[0]) ? 'checked' : ''}> ${c[1]}</label>`).join('')}</div>`,
-    rodape: '<button class="btn" data-padrao style="margin-right:auto">Padrão</button><button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>OK</button>' });
-  $('[data-padrao]', d.el).onclick = () => { guardar('colsN', null); d.fechar(); desenharNotas(); };
-  $('[data-ok]', d.el).onclick = () => { const sel = $$('[data-col]', d.el).filter((x) => x.checked).map((x) => x.dataset.col); if (!sel.length) return; guardar('colsN', sel); d.fechar(); desenharNotas(); };
+  const d = dialogo({ titulo: 'Colunas', tamanho: 'sm', corpo: `<p class="dica" style="margin:0 0 8px">Marque as colunas e arraste para mudar a ordem (ou arraste o título da coluna na grade).</p><div class="cols-ordem" id="cOrd">${ordemCols().map((c) => `<div class="col-it" draggable="true" data-k="${c[0]}"><span class="arr">⋮⋮</span><label class="chk"><input type="checkbox" data-col="${c[0]}" ${vis.includes(c[0]) ? 'checked' : ''}> ${c[1]}</label></div>`).join('')}</div>`,
+    rodape: '<button class="btn" data-padrao style="margin-right:auto">Padrão</button><button class="btn" data-ordem>Ordem padrão</button><button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>OK</button>' });
+  arrastavel($('#cOrd', d.el), '.col-it');
+  $('[data-padrao]', d.el).onclick = () => { guardar('colsN', null); guardar('ordemColsN', null); d.fechar(); desenharNotas(); };
+  $('[data-ordem]', d.el).onclick = () => { guardar('ordemColsN', null); d.fechar(); desenharNotas(); };
+  $('[data-ok]', d.el).onclick = () => { const sel = $$('[data-col]', d.el).filter((x) => x.checked).map((x) => x.dataset.col); if (!sel.length) return;
+    guardar('colsN', sel); guardar('ordemColsN', $$('.col-it', d.el).map((x) => x.dataset.k)); d.fechar(); desenharNotas(); };
+};
+function arrastavel(caixa, sel) {
+  let arr = null;
+  $$(sel, caixa).forEach((it) => { it.ondragstart = (e) => { arr = it; it.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', it.dataset.k); } catch (_) {} };
+    it.ondragend = () => { it.classList.remove('arrastando'); arr = null; };
+    it.ondragover = (e) => { if (!arr || arr === it) return; e.preventDefault(); const r = it.getBoundingClientRect(); caixa.insertBefore(arr, e.clientY > r.top + r.height / 2 ? it.nextSibling : it); }; });
 };
 function desenharNotas() {
   const g = $('#gN'), N = S.notas; if (!g || !N) return;
@@ -547,18 +656,25 @@ function desenharNotas() {
     <tbody>${linhas.map((n) => `<tr data-i="${N.linhas.indexOf(n)}">${cols.map(([, , fn, , cl]) => `<td class="${cl || ''}">${fn(n)}</td>`).join('')}${conectorAqui() ? `<td><div class="docbtns"><button data-pdf title="DANFSe (PDF)">${ico('pdf')}</button><button data-xml title="Baixar XML">${ico('xml')}</button></div></td>` : ''}</tr>`).join('')}</tbody></table>`
     : `<div class="vazio">${S.empresas.length ? 'Nenhuma nota no período.' : 'Nenhuma empresa publicada ainda pelo programa do PC.'}</div>`;
   $$('th[data-ord]', g).forEach((th) => (th.onclick = () => { const k = th.dataset.ord; S.ordN = { c: k, d: S.ordN.c === k ? -S.ordN.d : 1 }; guardar('ordN', S.ordN); desenharNotas(); }));
+  $$('th[data-ord]', g).forEach((th) => { th.draggable = true; th.ondragstart = (e) => { e.dataTransfer.setData('text/plain', th.dataset.ord); };
+    th.ondragover = (e) => e.preventDefault();
+    th.ondrop = (e) => { e.preventDefault(); const de = e.dataTransfer.getData('text/plain'), para = th.dataset.ord; if (!de || de === para) return;
+      const o = ordemCols().map((c) => c[0]).filter((k) => k !== de); o.splice(o.indexOf(para), 0, de); guardar('ordemColsN', o); desenharNotas(); }; });
   $$('tbody tr', g).forEach((tr) => (tr.oncontextmenu = (ev) => { $$('tbody tr', g).forEach((x) => x.classList.toggle('sel', x === tr)); menuNota(ev, N.linhas[tr.dataset.i]); }));
   $$('tbody tr', g).forEach((tr) => { tr.onclick = (ev) => { if (ev.target.closest('.docbtns')) return; $$('tbody tr', g).forEach((x) => x.classList.toggle('sel', x === tr)); }; tr.ondblclick = (ev) => { if (!ev.target.closest('.docbtns')) detalheNota(N.linhas[tr.dataset.i]); }; });
   $$('[data-pdf],[data-xml]', g).forEach((b) => (b.onclick = tenta(async () => { const n = N.linhas[b.closest('tr').dataset.i]; await baixarDoConector(n, b.hasAttribute('data-pdf') ? 'pdf' : 'xml'); })));
   const t = N.totais;
   $('#nCont').textContent = `${t.total.toLocaleString('pt-BR')} registro(s) · ${t.empresas} empresa(s)${t.total > N.linhas.length ? ` · mostrando ${N.linhas.length}` : ''}`;
-  const bloco = (titulo, pares, total) => `<fieldset><legend>${titulo}</legend><dl>${pares.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}${total !== undefined ? `<dt class="tot">Total</dt><dd class="tot">${total}</dd>` : ''}</dl></fieldset>`;
+  const FTOT = { Regular: ['sit', 'regular'], Cancelada: ['sit', 'cancelada'], 'Substituída': ['sit', 'substituida'], vDescIncond: ['ret', 'desc_incond'], vDescCond: ['ret', 'desc_cond'], vDR: ['ret', 'dr'],
+    vTotalRet: ['ret', 'com'], 'vISSQN retido': ['ret', 'iss'], vRetCP: ['ret', 'inss'], vRetIRRF: ['ret', 'ir'], vRetCSLL: ['ret', 'csll'] };
+  const bloco = (titulo, pares, total) => `<fieldset><legend>${titulo}</legend><dl>${pares.map(([k, v]) => FTOT[k] ? `<dt><a href="#" class="filtra" data-ft="${esc(k)}" title="Mostrar só estas notas">${k}</a></dt><dd>${v}</dd>` : `<dt>${k}</dt><dd>${v}</dd>`).join('')}${total !== undefined ? `<dt class="tot">Total</dt><dd class="tot">${total}</dd>` : ''}</dl></fieldset>`;
   const vRet = t.v_iss_retido + t.v_ret_cp + t.v_ret_irrf + t.v_ret_csll;
   $('#nTot').innerHTML = bloco('Documentos', [['Regular', t.regular], ['Cancelada', t.cancelada], ['Substituída', t.substituida]], t.total) +
     bloco('Totais (só Regular)', [['vServ', brl(t.v_serv)], ['vDescIncond', brl(t.v_desc_incond)], ['vDescCond', brl(t.v_desc_cond)], ['vDR', brl(t.v_dr)], ['vTotalRet', brl(t.v_total_ret)], ['vLiq', brl(t.v_liq)]]) +
     bloco('Retenções (só Regular)', [['vISSQN retido', brl(t.v_iss_retido)], ['vRetCP', brl(t.v_ret_cp)], ['vRetIRRF', brl(t.v_ret_irrf)], ['vRetCSLL', brl(t.v_ret_csll)]], brl(vRet)) +
     bloco('Impostos (só Regular)', [['vISSQN', brl(t.v_iss)], ['vPis', brl(t.v_pis)], ['vCofins', brl(t.v_cofins)]], brl(t.v_iss + t.v_pis + t.v_cofins)) +
     bloco('IBS/CBS (só Regular)', [['vIBSUF', brl(t.v_ibs_uf)], ['vIBSMun', brl(t.v_ibs_mun)], ['vCBS', brl(t.v_cbs)], ['vIBSSN', brl(t.v_ibs_sn)], ['vCBSSN', brl(t.v_cbs_sn)]], brl(t.v_ibs_uf + t.v_ibs_mun + t.v_cbs + t.v_ibs_sn + t.v_cbs_sn));
+  $$('[data-ft]', $('#nTot')).forEach((a) => (a.onclick = (ev) => { ev.preventDefault(); const [campo, valor] = FTOT[a.dataset.ft]; S.fN[campo] = valor; if (campo === 'ret' && !S.fN.sit) S.fN.sit = 'regular'; guardar('fNWeb', S.fN); vNotas(); }));
 }
 function detalheNota(n) {
   const ov = document.createElement('div'); ov.className = 'lado-ov';
@@ -587,6 +703,8 @@ function detalheNota(n) {
 
 // planilha (mesmas abas e colunas do programa do PC)
 const RET_ISS = { 1: '1 - Não Retido', 2: '2 - Retido pelo Tomador', 3: '3 - Retido pelo Intermediário' };
+const FILTRO_RET = { '': 'Com e sem ret., desc. e ded.', com: 'Com retenção, desconto ou dedução', sem: 'Sem retenção, desconto ou dedução', iss: 'Com ISS retido', inss: 'Com INSS retido (vRetCP)',
+  ir: 'Com IR retido (vRetIRRF)', csll: 'Com PIS/COFINS/CSLL retidos', desc_incond: 'Com vDescIncond', desc_cond: 'Com vDescCond', dr: 'Com vDR (dedução)' };
 const COLS_X = [['situacao', 12, (n) => (n.situacao || '').toUpperCase()], ['serie', 8, (n) => n.serie], ['nDPS', 15, (n) => n.n_dps], ['nNFSe', 15, (n) => n.numero],
   ['dhEmi', 16, (n) => n.dh_emi, 'datahora'], ['dCompet', 11, (n) => n.d_compet, 'data'], ['emit_CNPJ/CPF', 19, (n) => fmtDoc(n.prest_doc)], ['emit_xNome', 38, (n) => n.prest_nome],
   ['toma_CNPJ/CPF/NIF', 19, (n) => fmtDoc(n.toma_doc)], ['toma_xNome', 38, (n) => n.toma_nome], ['xLocIncid', 18, (n) => n.municipio],
@@ -602,7 +720,7 @@ const COLS_X = [['situacao', 12, (n) => (n.situacao || '').toUpperCase()], ['ser
 ACOES.planilhaN = async () => {
   if (!S.notas?.totais.total) throw new Error('Nenhuma nota no filtro.');
   const tipo = S.fN.tipo, marc = guardado('abasPlan', ['emitidas', 'recebidas']);
-  const op = [['emitidas', 'Emitidas', tipo !== 'recebida'], ['recebidas', 'Recebidas', tipo !== 'emitida'], ['mes', 'Total por mês (emitidas − recebidas)', true], ['ctn', 'Total por código de serviço (cTribNac/NBS)', true]];
+  const op = [['emitidas', 'Emitidas', tipo !== 'recebida'], ['recebidas', 'Recebidas', tipo !== 'emitida'], ['mes', 'Total por mês (por CNPJ)', true], ['ctn', 'Total por código de serviço (cTribNac/NBS)', true]];
   const d = dialogo({ titulo: 'Planilha', tamanho: 'sm', corpo: `<div class="dica">${fmtD(S.fN.ini)} a ${fmtD(S.fN.fim)} (por ${S.fN.data === 'competencia' ? 'competência' : 'data de geração'})</div>
     <div style="margin:12px 0 6px">Abas da planilha:</div>${op.map(([k, t, o]) => `<label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" data-ab="${k}" ${o && marc.includes(k) ? 'checked' : ''} ${o ? '' : 'disabled'}> ${t}</label>`).join('')}
     <p class="dica">Totais somam só as notas regulares e respeitam o filtro do Excel.</p>`, rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Salvar</button>' });
@@ -621,17 +739,17 @@ ACOES.planilhaN = async () => {
     const ref = (n) => (S.fN.data === 'competencia' ? n.d_compet : new Date(n.dh_proc).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) || '';
     if (pedidas.includes('mes')) {
       const m = new Map();
-      for (const n of reg) { const k = n.empresa_doc + '|' + ref(n).slice(0, 7); const o = m.get(k) || { emp: nomeE(n.empresa_doc), mes: ref(n).slice(0, 7), e: 0, r: 0 }; o[n.tipo === 'emitida' ? 'e' : 'r'] += n.v_serv; m.set(k, o); }
-      abasX.push({ aba: 'Total por mês', colunas: [{ titulo: 'Empresa', largura: 40 }, { titulo: 'Mês', tipo: 'mes', largura: 10 }, { titulo: 'Emitidas (vServ)', tipo: 'moeda', largura: 16 }, { titulo: 'Recebidas (vServ)', tipo: 'moeda', largura: 16 }, { titulo: 'Diferença', tipo: 'formula', formula: 'C{r}-D{r}', largura: 16 }],
-        linhas: [...m.values()].sort((a, b) => a.emp.localeCompare(b.emp) || a.mes.localeCompare(b.mes)).map((o) => [o.emp, o.mes, o.e, o.r, o.e - o.r]) });
+      for (const n of reg) { const k = n.empresa_doc + '|' + ref(n).slice(0, 7); const o = m.get(k) || { doc: fmtDoc(n.empresa_doc), emp: nomeE(n.empresa_doc), mes: ref(n).slice(0, 7), e: 0, r: 0 }; o[n.tipo === 'emitida' ? 'e' : 'r'] += n.v_serv; m.set(k, o); }
+      abasX.push({ aba: 'Total por mês', colunas: [{ titulo: 'CNPJ/CPF', largura: 20 }, { titulo: 'Empresa', largura: 40 }, { titulo: 'Mês', tipo: 'mes', largura: 10 }, { titulo: 'Emitidas (vServ)', tipo: 'moeda', largura: 16 }, { titulo: 'Recebidas (vServ)', tipo: 'moeda', largura: 16 }],
+        linhas: [...m.values()].sort((a, b) => a.doc.localeCompare(b.doc) || a.mes.localeCompare(b.mes)).map((o) => [o.doc, o.emp, o.mes, o.e, o.r]) });
     }
     if (pedidas.includes('ctn')) {
       const m = new Map(), fc = (c) => (/^\d{6}$/.test(c || '') ? `${c.slice(0, 2)}.${c.slice(2, 4)}.${c.slice(4)}` : c);
-      for (const n of reg) { const k = [n.empresa_doc, n.cod_trib, n.c_nbs].join('|'); const o = m.get(k) || { emp: nomeE(n.empresa_doc), c: n.cod_trib, x: n.x_trib_nac, nbs: n.c_nbs, en: 0, ev: 0, rn: 0, rv: 0 };
+      for (const n of reg) { const k = [n.empresa_doc, n.cod_trib, n.c_nbs].join('|'); const o = m.get(k) || { doc: fmtDoc(n.empresa_doc), emp: nomeE(n.empresa_doc), c: n.cod_trib, x: n.x_trib_nac, nbs: n.c_nbs, en: 0, ev: 0, rn: 0, rv: 0 };
         if (n.tipo === 'emitida') { o.en++; o.ev += n.v_serv; } else { o.rn++; o.rv += n.v_serv; } m.set(k, o); }
-      abasX.push({ aba: 'Total por CTN-NBS', colunas: [{ titulo: 'Empresa', largura: 40 }, { titulo: 'cTribNac', largura: 10 }, { titulo: 'xTribNac', largura: 60 }, { titulo: 'cNBS', largura: 14 },
+      abasX.push({ aba: 'Total por CTN-NBS', colunas: [{ titulo: 'CNPJ/CPF', largura: 20 }, { titulo: 'Empresa', largura: 40 }, { titulo: 'cTribNac', largura: 10 }, { titulo: 'xTribNac', largura: 60 }, { titulo: 'cNBS', largura: 14 },
         { titulo: 'Emitidas (notas)', tipo: 'inteiro', somar: true, largura: 10 }, { titulo: 'Emitidas (vServ)', tipo: 'moeda', largura: 16 }, { titulo: 'Recebidas (notas)', tipo: 'inteiro', somar: true, largura: 10 }, { titulo: 'Recebidas (vServ)', tipo: 'moeda', largura: 16 }],
-        linhas: [...m.values()].sort((a, b) => a.emp.localeCompare(b.emp) || String(a.c).localeCompare(String(b.c))).map((o) => [o.emp, fc(o.c), o.x, o.nbs || 'Sem código', o.en, o.ev, o.rn, o.rv]) });
+        linhas: [...m.values()].sort((a, b) => a.doc.localeCompare(b.doc) || String(a.c).localeCompare(String(b.c))).map((o) => [o.doc, o.emp, fc(o.c), o.x, o.nbs || 'Sem código', o.en, o.ev, o.rn, o.rv]) });
     }
     if (!abasX.length) throw new Error('Nenhuma aba com notas para o tipo escolhido.');
     const emp = S.empresaSel === 'todas' ? 'Todas' : nomeE(S.empresaSel);
@@ -651,13 +769,20 @@ function vEventos() {
   $('#main').innerHTML = `<div class="filtros"><select id="ePer">${opcoes(PERIODOS, f.per)}</select>
     <input type="date" class="data" id="eIni" value="${f.ini}"><input type="date" class="data" id="eFim" value="${f.fim}">
     <input class="busca" style="flex:0 1 420px" id="eQ" placeholder="Procurar por evento, chave ou motivo" value="${esc(f.q)}"><button class="btn pri" id="eFiltrar">${ico('filtro')} Filtrar</button></div>
-    <div class="grade" id="gE"><div class="vazio">Carregando…</div></div><div class="rodape"><span class="cont" id="eCont"></span></div>`;
+    <div class="grade" id="gE"><div class="vazio">Carregando…</div></div><div class="rodape"><button class="btn" data-act="planilhaE">${ico('excel')} Gerar relação</button><span class="cont" id="eCont"></span></div>`;
   const ler = () => { Object.assign(f, { per: $('#ePer').value, ini: $('#eIni').value, fim: $('#eFim').value, q: $('#eQ').value }); guardar('fEWeb', f); };
   $('#ePer').onchange = () => { ler(); if (f.per !== 'livre') { aplicaPeriodo(f); $('#eIni').value = f.ini; $('#eFim').value = f.fim; } carregarEventos(); };
   ['eIni', 'eFim'].forEach((i) => ($('#' + i).onchange = () => { $('#ePer').value = 'livre'; ler(); carregarEventos(); }));
   $('#eFiltrar').onclick = () => { ler(); carregarEventos(); }; $('#eQ').onkeydown = (e) => { if (e.key === 'Enter') { ler(); carregarEventos(); } };
   carregarEventos();
 }
+ACOES.planilhaE = () => {
+  const l = S.eventosVis || []; if (!l.length) throw new Error('Nenhum evento na tela para gerar a relação.');
+  const nomeE = (doc) => (S.empresas.find((e) => e.doc === doc) || {}).nome || doc, f = S.fE;
+  const colunas = [['CNPJ/CPF', 20], ['Empresa', 40], ['Evento', 40], ['Data', 18, 'texto'], ['NFS-e', 12], ['Chave da NFS-e', 52], ['Autor', 20], ['Motivo', 60]].map(([titulo, largura]) => ({ titulo, largura }));
+  salvarArquivo(window.gerarXlsx({ abas: [{ aba: 'Eventos', colunas, linhas: l.map((e) => [fmtDoc(e.empresa_doc), nomeE(e.empresa_doc), e.descricao || '', fmtDH(e.dh_evento), e.numero || '', e.chave_nfse || '', fmtDoc(e.autor), e.motivo || '']) }] }),
+    `Eventos_${fmtD(f.ini).replace(/\//g, '-')}_a_${fmtD(f.fim).replace(/\//g, '-')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+};
 const carregarEventos = tenta(async () => {
   const f = S.fE;
   let q = sb.from('eventos').select('*').eq('escritorio_id', S.esc).order('dh_evento', { ascending: false }).limit(3000);
@@ -667,7 +792,7 @@ const carregarEventos = tenta(async () => {
   let l = ok(await q);
   const t = (f.q || '').trim().toLowerCase();
   if (t) l = l.filter((e) => [e.descricao, e.chave_nfse, e.motivo, e.numero, e.autor].join(' ').toLowerCase().includes(t));
-  $('#eCont').textContent = `${l.length} evento(s)`;
+  $('#eCont').textContent = `${l.length} evento(s)`; S.eventosVis = l;
   const nomeE = (doc) => (S.empresas.find((e) => e.doc === doc) || {}).nome || doc;
   $('#gE').innerHTML = l.length ? `<table><thead><tr><th>Evento</th><th>Data</th><th>NFS-e</th><th>Empresa</th><th>Autor</th><th>Motivo</th></tr></thead><tbody>
     ${l.map((e) => `<tr><td>${esc(e.descricao)}</td><td>${fmtDH(e.dh_evento)}</td><td>${esc(e.numero || (e.chave_nfse || '').slice(-15))}</td><td>${esc(nomeE(e.empresa_doc))}</td><td>${fmtDoc(e.autor)}</td><td title="${esc(e.motivo)}">${esc(e.motivo)}</td></tr>`).join('')}</tbody></table>`
@@ -805,6 +930,8 @@ function menuEmpresa(ev, e) {
     { t: 'Sincronizar só esta empresa', ico: 'sync', fn: async () => { const r = await comando('sync', { docs: [e.doc] }, 'Pedindo a sincronização…'); toast(r.enfileiradas ? 'Sincronizando. As notas novas aparecem em instantes.' : 'Já estava sincronizando.', 'ok'); atualizarDepois(); } },
     { t: 'Baixar tudo de novo desde o início', fn: () => confirmar(`Baixar tudo de novo: ${e.nome}?`, 'O conector pede ao Ambiente Nacional todos os documentos da empresa desde o primeiro (NSU 0), de qualquer período. As notas que já estão gravadas não se repetem; o que faltar é completado. Pode levar alguns minutos.', 'Baixar tudo',
       tenta(async () => { await comando('sync', { docs: [e.doc], desdeInicio: true }, 'Pedindo o download completo…'); toast('Baixando todos os documentos desde o início. As notas que faltarem aparecem em instantes.', 'ok'); atualizarDepois(15000); })) },
+    { t: 'Editar… (nome, certificado, pasta, NSU)', fn: () => ACOES.editarEmpresa(e.doc) },
+    { t: 'Testar acesso ao Ambiente Nacional', fn: async () => { exigirConectorNovo('3.7.0'); const t = await comando('testar_empresa', { doc: e.doc }, 'Testando o acesso…'); toast(t.ok ? 'Acesso liberado no Ambiente Nacional.' : 'Sem acesso: ' + (t.erro || ''), t.ok ? 'ok' : 'erro'); } },
     { t: 'Ver notas desta empresa', ico: 'notas', fn: () => { S.empresaSel = e.doc; guardar('empresaSelWeb', S.empresaSel); carregarEmpresas(); irPara('notas'); } },
     { t: 'Abrir pasta da empresa', ico: 'pasta', off: !aqui, dica: aqui ? '' : 'Só no computador do conector', fn: () => abrirPastaConector(e.doc) },
     { t: 'Histórico desta empresa', fn: () => ACOES.historico(e.doc) }, '-',
@@ -1075,13 +1202,14 @@ ACOES.menuUsuario = (el) => {
   const r = el.getBoundingClientRect(), m = document.createElement('div'); m.className = 'menu';
   m.style.top = r.bottom + 4 + 'px'; m.style.right = innerWidth - r.right + 'px';
   m.innerHTML = `<div style="padding:6px 14px 8px"><b>${esc(S.membros.find((x) => x.escritorio_id === S.esc)?.nome || '')}</b><div class="dica">${esc(S.user.email)} · operador${S.superu ? ' · administrador do site' : ''}</div></div><hr>
-    <button data-m="prefs">Preferências…</button><button data-m="dados">Meus dados</button><button data-m="senha">Trocar minha senha</button><button data-m="sair">Sair</button>`;
+    <button data-m="prefs">Preferências…</button><button data-m="abas">Abas visíveis…</button><button data-m="dados">Meus dados</button><button data-m="senha">Trocar minha senha</button><button data-m="sair">Sair</button>`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', function f(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('click', f); } }), 0);
   $('[data-m=sair]', m).onclick = () => ACOES.sair();
   $('[data-m=dados]', m).onclick = () => { m.remove(); ACOES.meusDados(); };
   $('[data-m=prefs]', m).onclick = () => { m.remove(); tenta(ACOES.prefsConector)(); };
   $('[data-m=senha]', m).onclick = () => { m.remove(); telaLogin('novasenha'); };
+  $('[data-m=abas]', m).onclick = () => { m.remove(); ACOES.abasVisiveis(); };
 };
 ACOES.sair = async () => { await sb.auth.signOut(); location.reload(); };
 

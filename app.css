@@ -328,3 +328,8 @@ a.x-mini:hover{color:#c5221f}
 .prefs-corpo{padding:14px 18px;overflow:auto;max-height:66vh}
 .prefs .exemplo{margin:0;font-size:11px;color:#667;background:#f6f7f9;border:1px solid var(--line);border-radius:4px;padding:6px 8px;white-space:pre;overflow:auto}
 .cols-lista{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.form2 > label{display:block;margin:6px 0 2px;color:#333}.form2 > label > input,.form2 > label > select,.form2 > label > textarea{display:block;width:100%;margin-top:3px}.form2 textarea{font-family:inherit;padding:6px}.form2 .linha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cols-ordem{display:flex;flex-direction:column;gap:2px;max-height:56vh;overflow:auto}
+.col-it{display:flex;align-items:center;gap:8px;padding:3px 6px;border:1px solid transparent;border-radius:3px;background:#fff;cursor:grab}
+.col-it:hover{border-color:var(--line)}.col-it.arrastando{opacity:.4}.col-it .arr{color:var(--muted2);font-size:12px;letter-spacing:-2px}
+.totais a.filtra{color:inherit;text-decoration:none;border-bottom:1px dotted #8c8c8c}.totais a.filtra:hover{color:var(--navy)}
