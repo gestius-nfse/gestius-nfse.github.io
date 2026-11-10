@@ -50,6 +50,9 @@ const ico = (n, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none
 // ============================================================
 I.apoie = I.coracao || '<path d="M12 20s-7.5-4.6-9.2-9.3C1.6 7.3 3.8 4 7.2 4c2 0 3.4 1.1 4.8 2.8C13.4 5.1 14.8 4 16.8 4c3.4 0 5.6 3.3 4.4 6.7C19.5 15.4 12 20 12 20Z"/>';
 I.admin = '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/>';
+I.pasta = '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>';
+I.conferir = '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/><path d="m8 11 2 2 4-4"/>';
+I.alteracoes = '<path d="M4 8h13l-3-3M20 16H7l3 3"/>';
 I.usuarios = '<path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M2.5 20c.5-3.4 3.2-5.5 6.5-5.5s6 2.1 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14.6c2 .7 3.3 2.6 3.5 5.4"/>';
 const CFG = window.GESTIUS || {};
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnon, { auth: { persistSession: true, autoRefreshToken: true } });
@@ -67,7 +70,7 @@ function traduz(e) {
   if (/Password should be at least|weak password|password.*(characters|contain)/i.test(m)) return 'Senha fraca: use pelo menos 8 caracteres, com letras e números.';
   if (/same.*password|different from the old/i.test(m)) return 'A nova senha precisa ser diferente da atual.';
   if (/JWT expired|invalid JWT|session.*missing/i.test(m)) return 'A sua sessão expirou. Entre de novo.';
-  if (/row-level security|permission denied/i.test(m)) return 'Você não tem permissão para isso. Fale com o administrador do escritório.';
+  if (/row-level security|permission denied/i.test(m)) return 'Você não tem permissão para isso. Fale com o administrador do site.';
   if (/rate limit/i.test(m)) return 'Muitas tentativas. Aguarde alguns minutos.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o servidor. Confira a internet.';
   return m;
@@ -170,7 +173,7 @@ function telaLogin(modo = 'login', aviso = '') {
   $('#app').innerHTML = `<div class="login"><form class="caixa" id="fLogin" novalidate>
     <div class="wm"><b>GESTIUS</b><span>NFS-E</span></div>
     <h1>${conv ? 'Entrar no escritório' : cad ? 'Criar conta grátis' : rec ? 'Recuperar a senha' : nova ? 'Nova senha' : 'Entrar'}</h1>
-    <p>${conv ? (cl ? 'Você recebeu um convite. Crie a sua senha para acessar as notas do escritório.' : 'Crie a sua conta com o e-mail que o administrador do escritório convidou.')
+    <p>${conv ? (cl ? 'Você recebeu um convite. Crie a sua senha para acessar as notas do escritório.' : 'Crie a sua conta. O administrador do site inclui você no escritório (ou use o link de convite que recebeu).')
       : cad ? 'As NFS-e de todas as suas empresas, baixadas do Ambiente Nacional, num só lugar.' : rec ? 'Enviaremos um link para o seu e-mail.' : nova ? 'Escolha a nova senha.' : 'Notas fiscais de serviço de todas as suas empresas, num só lugar.'}</p>
     ${aviso ? `<div class="faixa ok-faixa" style="margin-bottom:12px">${esc(aviso)}</div>` : ''}
     ${cad ? `<div class="seg" role="tablist"><button type="button" class="${conv ? '' : 'on'}" data-ir="cadastro">Criar escritório novo</button><button type="button" class="${conv ? 'on' : ''}" data-ir="convidado">Meu escritório já usa</button></div>` : ''}
@@ -184,7 +187,7 @@ function telaLogin(modo = 'login', aviso = '') {
     <div class="erro-txt" id="loginErro" style="min-height:18px;margin:-4px 0 8px"></div>
     <button class="btn ${cad ? 'ouro' : 'pri'}" type="submit">${conv ? 'Criar conta e entrar no escritório' : cad ? 'Criar conta grátis' : rec ? 'Enviar link' : nova ? 'Salvar senha' : 'Entrar'}</button>
     <div class="troca">${cad ? 'Já tem conta? <a data-ir="login">Entrar</a>' : rec || nova ? '<a data-ir="login">Voltar</a>' : 'Ainda não tem conta? <a data-ir="cadastro">Criar conta grátis</a><br><a data-ir="recuperar" style="font-weight:400">Esqueci a senha</a>'}</div>
-    ${conv ? '<p class="dica" style="text-align:center;margin:10px 0 0">Ainda não foi convidado? Peça ao administrador do escritório: aba <b>Usuários → Convidar pessoa</b>.</p>' : ''}
+    ${conv ? '<p class="dica" style="text-align:center;margin:10px 0 0">Depois de criar a conta, avise o administrador do site para incluir você no escritório.</p>' : ''}
     <div class="assin">DECISÕES SEGURAS, GESTÃO INTELIGENTE.</div>
   </form></div>`;
   const f = $('#fLogin');
@@ -233,7 +236,7 @@ function telaLogin(modo = 'login', aviso = '') {
 async function telaSemEscritorio() {
   $('#app').innerHTML = `<div class="login"><div class="caixa"><div class="wm"><b>GESTIUS</b><span>NFS-E</span></div>
     <h1>Aguardando convite</h1><p>A sua conta está pronta, mas ainda não está em nenhum escritório (ou o escritório está suspenso).</p>
-    <p>Peça ao administrador do escritório para convidar <b>${esc(S.user.email)}</b> em <b>Usuários → Convidar pessoa</b> e abra o <b>link do convite</b> que ele enviar.</p>
+    <p>O administrador do site vai incluir <b>${esc(S.user.email)}</b> no escritório. Se você recebeu um <b>link de convite</b>, abra-o ou cole abaixo.</p>
     <div class="linha" style="margin-bottom:10px"><input id="linkConv" placeholder="ou cole aqui o link do convite" style="flex:1"><button class="btn pri" id="usarLink">Entrar</button></div>
     <details style="margin-top:6px"><summary class="dica" style="cursor:pointer">Prefiro criar o meu próprio escritório</summary>
       <div class="linha" style="margin-top:8px"><input id="novoEsc" placeholder="Nome do escritório" maxlength="120" style="flex:1"><button class="btn ouro" id="criarEsc">Criar</button></div></details>
@@ -267,13 +270,14 @@ async function iniciar() {
   await carregarEmpresas();
   irPara(S.aba);
   detectarConector().then(() => {
-    if (location.hash === '#conectar' && S.conector && !conectorAqui() && souAdmin()) { history.replaceState(null, '', location.pathname); ACOES.conectarPc(); }
+    if (location.hash === '#conectar' && S.conector && !conectorAqui() && podeOperar()) { history.replaceState(null, '', location.pathname); ACOES.conectarPc(); }
   });
-  clearInterval(S.tmCon); S.tmCon = setInterval(detectarConector, 60000);
+  clearInterval(S.tmCon); S.tmCon = setInterval(() => { detectarConector(); contarAlteracoesNovas().catch(() => {}); }, 60000);
+  contarAlteracoesNovas().catch(() => {});
 }
 sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') telaLogin('novasenha'); if (ev === 'SIGNED_OUT') telaLogin(); });
 
-const abas = () => [['empresas', 'Empresas'], ['notas', 'Emitidas / Recebidas'], ['eventos', 'Eventos'], ['usuarios', 'Usuários'], ['apoie', 'Apoie'],
+const abas = () => [['empresas', 'Empresas'], ['notas', 'Emitidas / Recebidas'], ['eventos', 'Eventos'], ['conferir', 'Conferir'], ['alteracoes', 'Alterações'], ['usuarios', 'Usuários'], ['apoie', 'Apoie'],
   ...(S.superu ? [['admin', 'Administração']] : [])];
 function montarShell() {
   const nome = S.membros.find((m) => m.escritorio_id === S.esc)?.nome || S.user.email;
@@ -303,7 +307,7 @@ function statusPc() {
   const min = e?.pc_visto_em ? Math.round((Date.now() - new Date(e.pc_visto_em)) / 60000) : null;
   const on = min !== null && min <= 30;
   el.innerHTML = `<span class="agente-st ${on ? 'on' : 'off'}" title="${e?.pc_host ? 'Computador: ' + esc(e.pc_host) : ''}"><i></i>${min === null ? 'Conector ainda não instalado' : on ? 'Conector do escritório ativo' : 'Conector sem enviar há ' + (min < 120 ? min + ' min' : Math.round(min / 60) + ' h')}</span>`
-    + (conectorAqui() ? ' <span class="pill ok">este computador é o conector</span>' : S.conector && souAdmin() ? ' <button class="btn" style="height:24px" data-act="conectarPc">Conectar este computador</button>' : '');
+    + (conectorAqui() ? ' <span class="pill ok">este computador é o conector</span>' : S.conector && podeOperar() ? ' <button class="btn" style="height:24px" data-act="conectarPc">Conectar este computador</button>' : '');
 }
 async function carregarEmpresas() {
   S.empresas = ok(await sb.from('empresas').select('*').eq('escritorio_id', S.esc).order('nome'));
@@ -316,22 +320,23 @@ function irPara(aba) {
   if (!abas().some(([k]) => k === aba)) aba = 'notas';
   S.aba = aba; guardar('abaWeb', aba);
   $$('.tab').forEach((b) => b.classList.toggle('on', b.dataset.aba === aba));
-  tenta({ empresas: vEmpresas, notas: vNotas, eventos: vEventos, usuarios: vUsuarios, apoie: vApoie, admin: vAdmin }[aba])();
+  tenta({ empresas: vEmpresas, notas: vNotas, eventos: vEventos, conferir: vConferir, alteracoes: vAlteracoes, usuarios: vUsuarios, apoie: vApoie, admin: vAdmin }[aba])();
 }
-const souAdmin = () => S.papel === 'admin';
+const podeOperar = () => !!S.esc; // todas as pessoas do escritório operam (empresas, conector, sincronização); gestão de pessoas é só do administrador do site
 
 // ---------------- empresas ----------------
 function vEmpresas() {
   const semPc = !S.escInfo?.pc_visto_em && !conectorAqui();
-  $('#main').innerHTML = `${semPc && souAdmin() ? `<div class="faixa" style="display:block;line-height:1.7">
+  $('#main').innerHTML = `${semPc && podeOperar() ? `<div class="faixa" style="display:block;line-height:1.7">
       <b>Falta instalar o conector</b> no computador do escritório que tem os certificados digitais (uma vez só):<br>
       1. Nesse computador, abra este site e clique em <a class="btn ouro" style="height:26px;margin:0 4px" href="${LINK_INSTALADOR}" download>Baixar o instalador</a><br>
       2. Abra o arquivo baixado. Se o Windows avisar, clique em <b>Mais informações → Executar assim mesmo</b>.<br>
       3. Volte ao site e clique em <b>Conectar este computador</b> (no rodapé). Se o navegador pedir acesso à rede local, clique em <b>Permitir</b>.</div>`
-      : semPc ? '<div class="faixa">O administrador do escritório ainda não instalou o conector.</div>' : ''}
-    ${!semPc ? `<div class="filtros">${souAdmin() ? `<button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button>` : ''}
-      <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><span class="dica">Os pedidos vão para o conector do escritório e levam alguns segundos.</span></div>` : ''}
-    <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th>${souAdmin() && (S.escInfo?.pc_visto_em || conectorAqui()) ? '<th style="width:96px"></th>' : ''}</tr></thead><tbody>
+      : semPc ? '<div class="faixa">O conector ainda não foi instalado no computador do escritório que tem os certificados.</div>' : ''}
+    ${!semPc ? `<div class="filtros">${podeOperar() ? `<button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button>` : ''}
+      <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><button class="btn" data-act="prefsConector">${ico('pasta')} Pasta e downloads</button>
+      ${conectorAqui() ? `<button class="btn" data-act="abrirPasta">${ico('pasta')} Abrir pasta dos XML</button>` : ''}<span class="dica">Os pedidos vão para o conector do escritório e levam alguns segundos.</span></div>` : ''}
+    <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th>${podeOperar() && (S.escInfo?.pc_visto_em || conectorAqui()) ? '<th style="width:130px"></th>' : ''}</tr></thead><tbody>
     ${S.empresas.map((e) => { const d = e.cert_validade ? diasAte(e.cert_validade) : null;
       const st = e.ult_status === 'erro' ? 'erro' : e.ult_status === 'aviso' ? 'aviso' : 'ok';
       return `<tr class="${e.ativo ? '' : 'inativo'}" data-doc="${e.doc}"><td><span style="display:inline-block;min-width:150px">${fmtDoc(e.doc)}</span>${esc(e.nome)}</td>
@@ -340,12 +345,13 @@ function vEmpresas() {
       <td>${e.ult_sync ? `<span class="sinc ${st}" title="${esc(e.ult_msg || '')}">${ico(st, 'ico')} ${fmtDH(e.ult_sync)}${st === 'erro' ? ` <span class="erro-txt">${esc((e.ult_msg || '').slice(0, 70))}</span>` : ''}</span>` : '<span class="dica">nunca</span>'}</td></tr>`; }).join('')}
     </tbody></table>` : '<div class="vazio">Nenhuma empresa publicada ainda.</div>'}</div>`;
   $$('#gEmp tbody tr').forEach((tr) => (tr.ondblclick = () => { S.empresaSel = tr.dataset.doc; guardar('empresaSelWeb', S.empresaSel); carregarEmpresas(); irPara('notas'); }));
-  if (souAdmin() && !semPc) $$('#gEmp tbody tr').forEach((tr) => {
+  if (podeOperar() && !semPc) $$('#gEmp tbody tr').forEach((tr) => {
     const e = S.empresas.find((x) => x.doc === tr.dataset.doc);
-    tr.insertAdjacentHTML('beforeend', `<td><div class="acoes"><button data-sy="${e.doc}" title="Sincronizar esta empresa">${ico('sync')}</button>
+    tr.insertAdjacentHTML('beforeend', `<td><div class="acoes"><button data-sy="${e.doc}" title="Sincronizar esta empresa">${ico('sync')}</button>${conectorAqui() ? `<button data-pa="${e.doc}" title="Abrir a pasta desta empresa">${ico('pasta')}</button>` : ''}
       <button data-at="${e.doc}" title="${e.ativo ? 'Desativar' : 'Ativar'}">${ico(e.ativo ? 'erro' : 'ok')}</button><button data-ex="${e.doc}" title="Excluir">${ico('lixo')}</button></div></td>`);
   });
   $$('[data-sy]').forEach((b) => (b.onclick = tenta(async () => { const r = await comando('sync', { docs: [b.dataset.sy] }, 'Pedindo a sincronização…'); toast(r.enfileiradas ? 'Sincronizando. As notas novas aparecem em instantes.' : 'Já estava sincronizando.', 'ok'); atualizarDepois(); })));
+  $$('[data-pa]').forEach((b) => (b.onclick = tenta(() => abrirPastaConector(b.dataset.pa))));
   $$('[data-at]').forEach((b) => (b.onclick = tenta(async () => { const e = S.empresas.find((x) => x.doc === b.dataset.at); await comando('ativar_empresa', { doc: e.doc, ativo: !e.ativo }); toast(e.ativo ? 'Empresa desativada.' : 'Empresa ativada.', 'ok'); atualizarDepois(3000); })));
   $$('[data-ex]').forEach((b) => (b.onclick = () => { const e = S.empresas.find((x) => x.doc === b.dataset.ex);
     confirmar(`Excluir ${e.nome}?`, 'A empresa e as notas dela saem do site e do conector. Os XML já gravados no computador continuam na pasta.', 'Excluir',
@@ -353,6 +359,47 @@ function vEmpresas() {
 }
 function atualizarDepois(ms = 8000) { setTimeout(async () => { await carregarEmpresas(); if (S.aba === 'empresas') vEmpresas(); }, ms); }
 ACOES.syncTodas = async () => { const r = await comando('sync', {}, 'Pedindo a sincronização…'); toast(`Sincronizando ${r.enfileiradas || 0} empresa(s).`, 'ok'); atualizarDepois(); };
+// ---------- pasta dos XML e preferências do conector ----------
+async function abrirPastaConector(doc) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await chamarConector('/ponte/abrir' + (doc ? `?doc=${doc}` : ''), { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token }, tempo: 10000 });
+  const j = await r.json(); toast(`Pasta aberta: ${j.pasta}`, 'ok');
+}
+ACOES.abrirPasta = () => abrirPastaConector('');
+const SUBPASTAS = { 'empresa/ano/mes/tipo': 'Empresa / AAAA / MM / Tipo', 'empresa/tipo/ano/mes': 'Empresa / Tipo / AAAA / MM', 'empresa/ano/mes': 'Empresa / AAAA / MM', 'empresa/tipo': 'Empresa / Tipo' };
+const FREQ = { 0: 'Só quando pedir', 30: 'A cada 30 minutos', 60: 'A cada 1 hora', 120: 'A cada 2 horas', 240: 'A cada 4 horas', diario: 'Uma vez por dia' };
+ACOES.prefsConector = async () => {
+  const { data } = await sb.from('conector_config').select('cfg,atualizado_em').eq('escritorio_id', S.esc).maybeSingle();
+  if (!data) throw new Error('O conector ainda não enviou as preferências. Ele envia ao conectar e a cada 30 minutos (atualize o conector se for uma versão antiga).');
+  const c = data.cfg || {};
+  const d = dialogo({ titulo: 'Pasta e downloads (computador do conector)', tamanho: 'lg', corpo: `
+    <p class="dica" style="margin:0 0 10px">Valem para o computador ${esc(c.host || 'do conector')}. Os XML de cada empresa são gravados sozinhos nesta pasta a cada sincronização.</p>
+    <div class="form" style="grid-template-columns:150px 1fr">
+      <label>Pasta geral</label><input id="pcPasta" value="${esc(c.pasta_xml || '')}" placeholder="C:\\Gestius NFS-e\\XML">
+      <label>Subpastas</label><select id="pcSub">${opcoes(SUBPASTAS, c.subpastas)}</select>
+      <label>Emitidas</label><input id="pcEm" value="${esc(c.pasta_emitidas || 'Emitidas')}" maxlength="60">
+      <label>Recebidas</label><input id="pcRe" value="${esc(c.pasta_recebidas || 'Recebidas')}" maxlength="60">
+      <label>Eventos</label><input id="pcEv" value="${esc(c.pasta_eventos || 'Eventos')}" maxlength="60">
+      <label>Ano/mês pela</label><select id="pcAm">${opcoes({ competencia: 'Data de competência', geracao: 'Data de geração' }, c.anomes_pela)}</select>
+      <label>PDF (DANFSe)</label><label class="chk"><input type="checkbox" id="pcPdf" ${c.gravar_pdf === '1' ? 'checked' : ''}> Gravar também o PDF ao lado de cada XML de nota</label>
+      <label>Baixar sozinho</label><div class="linha"><select id="pcFreq">${opcoes(FREQ, c.frequencia)}</select><input id="pcHora" type="time" value="${esc(c.horario || '18:00')}" style="width:110px"></div>
+    </div>
+    <div class="dica" style="margin-top:8px">Exemplo: <span class="mono" id="pcEx"></span></div>
+    <p class="dica">Depois de mudar a pasta ou a organização, use <b>Regravar arquivos</b> para copiar os XML já baixados para a nova estrutura. O PDF ocupa mais espaço e consulta o Ambiente Nacional uma vez por nota.</p>`,
+    rodape: '<button class="btn" data-regravar style="margin-right:auto">Regravar arquivos</button><button class="btn" data-reproc>Reprocessar notas</button><button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Salvar</button>' });
+  const ex = () => { const sub = $('#pcSub', d.el).value.split('/').slice(1).map((x) => ({ ano: '2026', mes: '10', tipo: $('#pcEm', d.el).value })[x]).join('\\');
+    $('#pcEx', d.el).textContent = `${$('#pcPasta', d.el).value.replace(/\\+$/, '')}\\EMPRESA LTDA\\${sub}\\<chave>.xml`;
+    $('#pcHora', d.el).style.display = $('#pcFreq', d.el).value === 'diario' ? '' : 'none'; };
+  $$('input,select', d.el).forEach((i) => (i.oninput = i.onchange = ex)); ex();
+  $('[data-ok]', d.el).onclick = tenta(async () => {
+    const dados = { pasta_xml: $('#pcPasta', d.el).value.trim(), subpastas: $('#pcSub', d.el).value, pasta_emitidas: $('#pcEm', d.el).value, pasta_recebidas: $('#pcRe', d.el).value,
+      pasta_eventos: $('#pcEv', d.el).value, anomes_pela: $('#pcAm', d.el).value, gravar_pdf: $('#pcPdf', d.el).checked ? '1' : '0', frequencia: $('#pcFreq', d.el).value, horario: $('#pcHora', d.el).value };
+    if (!/^([a-zA-Z]:\\|\\\\)/.test(dados.pasta_xml)) throw new Error('Informe a pasta completa, como C:\\Gestius NFS-e\\XML.');
+    await comando('config', dados, 'Enviando as preferências ao conector…'); d.fechar(); toast('Preferências salvas no conector.', 'ok');
+  });
+  $('[data-regravar]', d.el).onclick = tenta(async () => { const r = await comando('regravar', {}, 'Regravando os arquivos na pasta…'); toast(`${r.arquivos || 0} arquivo(s) gravados na pasta${r.erros ? ` · ${r.erros} com erro` : ''}.`, r.erros ? 'erro' : 'ok'); });
+  $('[data-reproc]', d.el).onclick = tenta(async () => { const r = await comando('reprocessar', {}, 'Relendo os XML guardados…'); toast(`${r.notas || 0} nota(s) relidas a partir do XML.`, 'ok'); });
+};
 ACOES.cadastrarCerts = async () => {
   const lista = ok(await sb.from('certificados').select('*').eq('escritorio_id', S.esc).order('titular'));
   const cad = new Set(S.empresas.map((e) => e.doc));
@@ -402,7 +449,8 @@ function vNotas() {
       <button class="btn pri" id="nFiltrar">${ico('filtro')} Filtrar</button><button class="btn" id="nLimpar">Limpar</button>
     </div>
     <div class="grade" id="gN"><div class="vazio">Carregando…</div></div>
-    <div class="rodape"><button class="btn" data-act="planilhaN">${ico('excel')} Planilha</button><span class="cont" id="nCont"></span></div>
+    <div class="rodape"><button class="btn" data-act="planilhaN">${ico('excel')} Planilha</button><button class="btn" data-act="relacaoN">${ico('pdf')} Relação</button>
+      <button class="btn" data-act="zipN" ${conectorAqui() ? '' : 'title="Os XML e PDF ficam no computador do conector: abra o site nele para baixar o Zip."'}>${ico('zip')} Zip (XML e PDF)</button><span class="cont" id="nCont"></span></div>
     <div class="totais" id="nTot"></div>`;
   const ler = () => { Object.assign(f, { tipo: $('#nTipo').value, data: $('#nData').value, per: $('#nPer').value, ini: $('#nIni').value, fim: $('#nFim').value,
     sit: $('#nSit').value, ret: $('#nRet').value, regime: $('#nReg').value, q: $('#nQ').value }); guardar('fNWeb', f); };
@@ -564,50 +612,251 @@ const carregarEventos = tenta(async () => {
     : '<div class="vazio">Nenhum evento no período.</div>';
 });
 
+// ---------------- Zip (XML/PDF pelo conector) e Relação (PDF pelo navegador) ----------------
+const nomeEmp = (doc) => (S.empresas.find((e) => e.doc === doc) || {}).nome || fmtDoc(doc);
+ACOES.zipN = async () => {
+  if (!conectorAqui()) throw new Error('Os XML e PDF ficam no computador do conector. Abra o site nele para baixar o Zip (ou use a pasta dos XML desse computador).');
+  if (!S.notas?.totais.total) throw new Error('Nenhuma nota no filtro.');
+  const tipo = S.fN.tipo, z = guardado('zipOp', { emitidas: true, recebidas: true, eventos: true, pdf: false, subpastas: true });
+  const d = dialogo({ titulo: 'Zip com os arquivos', tamanho: 'sm', corpo: `<div class="dica">${fmtD(S.fN.ini)} a ${fmtD(S.fN.fim)} · ${S.empresaSel === 'todas' ? 'todas as empresas' : esc(nomeEmp(S.empresaSel))} · filtro atual</div>
+    <div style="margin:12px 0 6px">Incluir:</div>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" id="zEm" ${z.emitidas && tipo !== 'recebida' ? 'checked' : ''} ${tipo === 'recebida' ? 'disabled' : ''}> Emitidas</label>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" id="zRe" ${z.recebidas && tipo !== 'emitida' ? 'checked' : ''} ${tipo === 'emitida' ? 'disabled' : ''}> Recebidas</label>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" id="zEv" ${z.eventos ? 'checked' : ''}> Eventos das notas (cancelamento, substituição…)</label>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" id="zPdf" ${z.pdf ? 'checked' : ''}> PDF (DANFSe) de cada nota</label>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="checkbox" id="zSub" ${z.subpastas ? 'checked' : ''}> Separar em pastas de ano/mês</label>
+    <p class="dica">Os PDFs que ainda não foram baixados são buscados no Ambiente Nacional agora (pode demorar alguns minutos).</p>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Gerar Zip</button>' });
+  $('[data-ok]', d.el).onclick = tenta(async () => {
+    const op = { emitidas: $('#zEm', d.el).checked, recebidas: $('#zRe', d.el).checked, eventos: $('#zEv', d.el).checked, pdf: $('#zPdf', d.el).checked, subpastas: $('#zSub', d.el).checked };
+    if (!op.emitidas && !op.recebidas) throw new Error('Escolha emitidas e/ou recebidas.');
+    guardar('zipOp', op); d.fechar();
+    const r = ok(await sb.rpc('consultar_notas', { p: filtroAtual({ tipo: op.emitidas && op.recebidas ? 'todas' : op.emitidas ? 'emitida' : 'recebida', limite: 5000 }) }));
+    if (r.totais.total > r.linhas.length) toast(`O Zip traz as primeiras ${r.linhas.length} notas. Para mais, use um período menor.`, 'erro');
+    toast(`Montando o Zip com ${r.linhas.length} nota(s)…`);
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await chamarConector('/ponte/zip', { method: 'POST', tempo: 900000, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ itens: r.linhas.map((n) => ({ doc: n.empresa_doc, chave: n.chave })), eventos: op.eventos, pdf: op.pdf, subpastas: op.subpastas }) });
+    salvarArquivo(await resp.arrayBuffer(), `NFSe_${S.empresaSel === 'todas' ? 'Todas' : nomeEmp(S.empresaSel)}_${fmtD(S.fN.ini).replace(/\//g, '-')}_a_${fmtD(S.fN.fim).replace(/\//g, '-')}.zip`.replace(/[\\/:*?"<>|]+/g, ' '), 'application/zip');
+  });
+};
+ACOES.relacaoN = async () => {
+  if (!S.notas?.totais.total) throw new Error('Nenhuma nota no filtro.');
+  const d = dialogo({ titulo: 'Relação de notas (PDF)', tamanho: 'sm', corpo: `<div class="dica">${fmtD(S.fN.ini)} a ${fmtD(S.fN.fim)} (por ${S.fN.data === 'competencia' ? 'competência' : 'data de geração'}) · filtro atual</div>
+    <div style="margin:12px 0 6px">Organização:</div>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="radio" name="rOrg" value="emp" checked> Uma página por empresa</label>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="radio" name="rOrg" value="junto"> Tudo junto</label>
+    <p class="dica">Abre a relação pronta para imprimir. Para gerar o PDF, escolha <b>Salvar como PDF</b> na impressora.</p>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Gerar</button>' });
+  $('[data-ok]', d.el).onclick = () => {
+    const porEmp = $('input[name=rOrg]:checked', d.el).value === 'emp'; d.fechar();
+    const w = window.open('', '_blank'); if (!w) return toast('O navegador bloqueou a janela. Permita pop-ups para este site.', 'erro');
+    w.document.write('<p style="font:14px Arial;padding:20px">Montando a relação…</p>');
+    tenta(async () => {
+      const r = ok(await sb.rpc('consultar_notas', { p: filtroAtual({ limite: 5000 }) }));
+      w.document.open(); w.document.write(htmlRelacao(r.linhas, porEmp)); w.document.close(); setTimeout(() => w.print(), 400);
+    })();
+  };
+};
+function htmlRelacao(linhas, porEmp) {
+  const SIT = { regular: 'Regular', cancelada: 'Cancelada', substituida: 'Substituída' };
+  const grupos = new Map();
+  for (const n of [...linhas].sort((a, b) => nomeEmp(a.empresa_doc).localeCompare(nomeEmp(b.empresa_doc)) || a.tipo.localeCompare(b.tipo) || String(a.dh_proc).localeCompare(String(b.dh_proc)))) {
+    const k = porEmp ? n.empresa_doc : 'todas'; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(n);
+  }
+  const tot = (l) => { const r = l.filter((n) => n.situacao === 'regular'); const s = (c) => r.reduce((a, n) => a + (Number(n[c]) || 0), 0);
+    return { q: l.length, reg: r.length, v: s('v_serv'), iss: s('v_iss'), issr: r.reduce((a, n) => a + (n.iss_retido ? n.v_iss : 0), 0), fed: s('v_ret_cp') + s('v_ret_irrf') + s('v_ret_csll'), liq: s('v_liq') }; };
+  const tabela = (l) => ['emitida', 'recebida'].map((t) => { const x = l.filter((n) => n.tipo === t); if (!x.length) return ''; const o = tot(x);
+    return `<h3>${t === 'emitida' ? 'Emitidas' : 'Recebidas'}</h3><table><thead><tr><th>Geração</th><th>Comp.</th><th>NFS-e</th><th>${t === 'emitida' ? 'Tomador' : 'Prestador'}</th><th>Situação</th><th class="n">Valor serviço</th><th class="n">ISS</th><th class="n">ISS retido</th><th class="n">Ret. federais</th><th class="n">Valor líquido</th></tr></thead><tbody>
+      ${x.map((n) => `<tr class="${n.situacao === 'regular' ? '' : 'canc'}"><td>${fmtDH(n.dh_proc)}</td><td>${fmtComp(n.d_compet)}</td><td>${esc(n.numero)}</td><td>${t === 'emitida' ? `${fmtDoc(n.toma_doc)} ${esc(n.toma_nome)}` : `${fmtDoc(n.prest_doc)} ${esc(n.prest_nome)}`}</td><td>${SIT[n.situacao] || esc(n.situacao)}</td>
+        <td class="n">${brl(n.v_serv)}</td><td class="n">${brl(n.v_iss)}</td><td class="n">${n.iss_retido ? brl(n.v_iss) : ''}</td><td class="n">${brl(n.v_ret_cp + n.v_ret_irrf + n.v_ret_csll)}</td><td class="n">${brl(n.v_liq)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="5">${o.q} nota(s) · totais só das ${o.reg} regulares</td><td class="n">${brl(o.v)}</td><td class="n">${brl(o.iss)}</td><td class="n">${brl(o.issr)}</td><td class="n">${brl(o.fed)}</td><td class="n">${brl(o.liq)}</td></tr></tfoot></table>`; }).join('');
+  const cab = `${esc(S.escInfo?.nome || '')} · ${fmtD(S.fN.ini)} a ${fmtD(S.fN.fim)} (por ${S.fN.data === 'competencia' ? 'competência' : 'data de geração'}) · emitido em ${new Date().toLocaleString('pt-BR')}`;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relação de NFS-e</title><style>
+    body{font:10px Arial,sans-serif;color:#111;margin:18px} h1{font-size:15px;margin:0 0 2px;color:#0F2C48} h2{font-size:12.5px;margin:14px 0 4px;color:#0F2C48;border-bottom:2px solid #CFA04B;padding-bottom:3px}
+    h3{font-size:11px;margin:10px 0 4px} .cab{color:#555;margin-bottom:8px} table{width:100%;border-collapse:collapse;margin-bottom:6px} th,td{border-bottom:1px solid #ddd;padding:3px 4px;text-align:left;vertical-align:top}
+    th{background:#f1f2f5;font-size:9.5px} .n{text-align:right;white-space:nowrap} tfoot td{font-weight:bold;border-top:1.5px solid #333;background:#fafafa} tr.canc td{color:#999;text-decoration:line-through}
+    .quebra{page-break-before:always} @page{size:A4 landscape;margin:12mm}</style></head><body>
+    ${[...grupos.entries()].map(([k, l], i) => `<div class="${i ? 'quebra' : ''}"><h1>Relação de NFS-e</h1><div class="cab">${cab}</div><h2>${k === 'todas' ? 'Todas as empresas' : `${fmtDoc(k)} - ${esc(nomeEmp(k))}`}</h2>${tabela(l)}</div>`).join('')}
+    <p style="color:#777;margin-top:10px">Gerado pelo Gestius NFS-e a partir das notas do Ambiente Nacional. Notas canceladas/substituídas aparecem riscadas e não entram nos totais.</p></body></html>`;
+}
+
+// ---------------- Conferir ----------------
+// regras objetivas, conferidas nota a nota; o contador marca como conferida depois de olhar
+const REGRAS = {
+  nbs: { t: 'Sem código NBS', d: 'A nota não informa o código NBS (cNBS), exigido no leiaute da NFS-e Nacional para a apuração do IBS/CBS.', f: (n) => !n.c_nbs },
+  competencia: { t: 'Emitida depois do mês da competência', d: 'A nota foi gerada em mês posterior ao da competência: confira se a receita/despesa está no período certo.', f: (n) => n.d_compet && n.dh_proc && new Date(n.dh_proc).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }).slice(0, 7) > n.d_compet.slice(0, 7) },
+  aliquota: { t: 'Alíquota de ISS fora de 2% a 5%', d: 'A LC 116/2003 fixa alíquota mínima de 2% (art. 8º-A, com exceções para alguns subitens) e máxima de 5% (art. 8º, II). Confira o enquadramento.', f: (n) => { const a = Number(String(n.p_aliq || '').replace(',', '.')); return n.p_aliq && n.v_iss > 0 && (a < 2 || a > 5); } },
+  retido_sem_iss: { t: 'ISS marcado como retido sem valor de ISS', d: 'A nota indica retenção do ISS pelo tomador/intermediário, mas o valor do ISS está zerado.', f: (n) => n.iss_retido && !(n.v_iss > 0) },
+  liquido: { t: 'Valor líquido não fecha', d: 'Valor líquido diferente de: valor do serviço − descontos (incondicionado e condicionado) − total retido. Diferença acima de R$ 0,01.', f: (n) => Math.abs((n.v_serv - n.v_desc_incond - n.v_desc_cond - n.v_total_ret) - n.v_liq) > 1 },
+  cancelada: { t: 'Cancelada ou substituída', d: 'Nota cancelada ou substituída no período: confira se foi retirada da apuração e da escrituração.', f: (n) => n.situacao !== 'regular' },
+};
+async function vConferir() {
+  const f = S.fC || (S.fC = guardado('fCWeb', { tipo: 'emitida', per: 'mes_passado', ini: '', fim: '', regra: '', st: 'pendentes', q: '' }));
+  if (f.per !== 'livre') aplicaPeriodo(f);
+  $('#main').innerHTML = `<div class="filtros"><select id="cTipo">${opcoes({ emitida: 'Emitidas', recebida: 'Recebidas', todas: 'Emitidas e recebidas' }, f.tipo)}</select>
+      <select id="cPer">${opcoes(PERIODOS, f.per)}</select><input type="date" class="data" id="cIni" value="${f.ini}"><input type="date" class="data" id="cFim" value="${f.fim}">
+      <select id="cRegra">${opcoes({ '': 'Todas as regras', ...Object.fromEntries(Object.entries(REGRAS).map(([k, r]) => [k, r.t])) }, f.regra)}</select>
+      <select id="cSt">${opcoes({ pendentes: 'Não conferidas', conferidas: 'Conferidas', todas: 'Todas' }, f.st)}</select>
+      <input class="busca" id="cQ" placeholder="Procurar por número, nome ou chave" value="${esc(f.q)}" style="flex:0 1 260px"></div>
+    <div class="grade" id="gC"><div class="vazio">Conferindo…</div></div>
+    <div class="rodape"><button class="btn pri" id="cMarcar" disabled>${ico('ok')} Marcar como conferida</button><button class="btn" id="cDesm" disabled>Desfazer</button><button class="btn" id="cPlan">${ico('excel')} Gerar relação</button><span class="cont" id="cCont"></span></div>
+    <p class="dica" id="cDica"></p>`;
+  const ler = () => { Object.assign(f, { tipo: $('#cTipo').value, per: $('#cPer').value, ini: $('#cIni').value, fim: $('#cFim').value, regra: $('#cRegra').value, st: $('#cSt').value, q: $('#cQ').value }); guardar('fCWeb', f); };
+  $('#cPer').onchange = () => { ler(); if (f.per !== 'livre') { aplicaPeriodo(f); $('#cIni').value = f.ini; $('#cFim').value = f.fim; } carregarConferir(); };
+  ['cIni', 'cFim'].forEach((i) => ($('#' + i).onchange = () => { $('#cPer').value = 'livre'; ler(); carregarConferir(); }));
+  ['cTipo', 'cRegra', 'cSt'].forEach((i) => ($('#' + i).onchange = () => { ler(); carregarConferir(); }));
+  $('#cQ').onkeydown = (e) => { if (e.key === 'Enter') { ler(); carregarConferir(); } };
+  carregarConferir();
+}
+const carregarConferir = tenta(async () => {
+  const f = S.fC; if (!$('#gC')) return;
+  const [r, conf] = await Promise.all([sb.rpc('consultar_notas', { p: { escritorio: S.esc, empresa: S.empresaSel, tipo: f.tipo, data: 'geracao', ini: f.ini, fim: f.fim, q: f.q, limite: 5000 } }).then(ok),
+    sb.from('conferencias').select('chave,regra,conferido_nome,conferido_em').eq('escritorio_id', S.esc).then(ok)]);
+  const feito = new Map(conf.map((c) => [c.chave + '|' + c.regra, c]));
+  const ocorr = [];
+  for (const n of r.linhas) for (const [k, rg] of Object.entries(REGRAS)) {
+    if (f.regra && f.regra !== k) continue;
+    if (!rg.f(n)) continue;
+    const c = feito.get(n.chave + '|' + k);
+    if (f.st === 'pendentes' && c) continue; if (f.st === 'conferidas' && !c) continue;
+    ocorr.push({ n, k, c });
+  }
+  S.ocorr = ocorr;
+  $('#cCont').textContent = `${ocorr.length} ocorrência(s)${r.totais.total > r.linhas.length ? ` · conferidas as primeiras ${r.linhas.length} notas do período` : ''}`;
+  $('#cDica').textContent = f.regra ? REGRAS[f.regra].d : 'Escolha uma regra para ver a explicação. As regras são objetivas; o contador decide se há ajuste e marca a nota como conferida.';
+  $('#gC').innerHTML = ocorr.length ? `<table><thead><tr><th style="width:28px"><input type="checkbox" id="cTodos"></th><th>Geração</th><th>Competência</th><th>Empresa</th><th>Emitida por / para</th><th>NFS-e</th><th class="num">Valor (R$)</th><th>Regra</th><th>Conferida</th></tr></thead><tbody>
+    ${ocorr.map((o, i) => `<tr data-i="${i}"><td><input type="checkbox" data-ci="${i}"></td><td>${fmtDH(o.n.dh_proc)}</td><td>${fmtComp(o.n.d_compet)}</td><td>${esc(nomeEmp(o.n.empresa_doc))}</td>
+      <td>${o.n.tipo === 'emitida' ? `<span class="tag t">T</span>${fmtDoc(o.n.toma_doc)} - ${esc(o.n.toma_nome)}` : `<span class="tag">P</span>${fmtDoc(o.n.prest_doc)} - ${esc(o.n.prest_nome)}`}</td><td>${esc(o.n.numero)}</td>
+      <td class="num">${brl(o.n.v_serv)}</td><td class="${o.c ? '' : 'erro-txt'}" title="${esc(REGRAS[o.k].d)}">${esc(REGRAS[o.k].t)}</td><td>${o.c ? `${ico('ok', 'ico ok-ico')} ${esc(o.c.conferido_nome || '')} <span class="dica">${fmtDH(o.c.conferido_em)}</span>` : ''}</td></tr>`).join('')}</tbody></table>`
+    : `<div class="vazio">${f.st === 'pendentes' ? 'Nenhuma pendência nas regras escolhidas. ✔' : 'Nenhuma ocorrência.'}</div>`;
+  const sel = () => $$('[data-ci]').filter((x) => x.checked).map((x) => ocorr[x.dataset.ci]);
+  const upd = () => { const s = sel(); $('#cMarcar').disabled = !s.some((o) => !o.c); $('#cDesm').disabled = !s.some((o) => o.c); };
+  $$('[data-ci]').forEach((x) => (x.onchange = upd));
+  $('#cTodos')?.addEventListener('change', (e) => { $$('[data-ci]').forEach((x) => (x.checked = e.target.checked)); upd(); });
+  $$('#gC tbody tr').forEach((tr) => (tr.ondblclick = () => detalheNota(ocorr[tr.dataset.i].n)));
+  const eu = S.membros.find((m) => m.escritorio_id === S.esc)?.nome || S.user.email;
+  $('#cMarcar').onclick = tenta(async () => { const s = sel().filter((o) => !o.c);
+    ok(await sb.from('conferencias').upsert(s.map((o) => ({ escritorio_id: S.esc, empresa_doc: o.n.empresa_doc, chave: o.n.chave, regra: o.k, conferido_nome: eu })), { onConflict: 'escritorio_id,empresa_doc,chave,regra' }));
+    toast(`${s.length} ocorrência(s) marcadas como conferidas.`, 'ok'); carregarConferir(); });
+  $('#cDesm').onclick = tenta(async () => { for (const o of sel().filter((x) => x.c)) ok(await sb.from('conferencias').delete().eq('escritorio_id', S.esc).eq('empresa_doc', o.n.empresa_doc).eq('chave', o.n.chave).eq('regra', o.k)); carregarConferir(); });
+  $('#cPlan').onclick = tenta(() => {
+    if (!ocorr.length) throw new Error('Nenhuma ocorrência para a relação.');
+    const col = [['Geração', 'datahora', 16], ['Competência', 'data', 11], ['Empresa', '', 34], ['Tipo', '', 10], ['NFS-e', '', 15], ['Prestador', '', 38], ['Tomador', '', 38], ['Valor (vServ)', 'moeda', 14], ['Regra', '', 38], ['Explicação', '', 60], ['Conferida por', '', 20], ['Conferida em', 'datahora', 16], ['Chave de acesso', '', 52]];
+    salvarArquivo(window.gerarXlsx({ abas: [{ aba: 'Conferência', colunas: col.map(([titulo, tipo, largura]) => ({ titulo, tipo, largura })),
+      linhas: ocorr.map((o) => [o.n.dh_proc, o.n.d_compet, nomeEmp(o.n.empresa_doc), o.n.tipo === 'emitida' ? 'Emitida' : 'Recebida', o.n.numero, `${fmtDoc(o.n.prest_doc)} - ${o.n.prest_nome || ''}`, `${fmtDoc(o.n.toma_doc)} - ${o.n.toma_nome || ''}`,
+        o.n.v_serv, REGRAS[o.k].t, REGRAS[o.k].d, o.c?.conferido_nome || '', o.c?.conferido_em || null, o.n.chave]) }] }),
+      `Conferencia_NFSe_${fmtD(S.fC.ini).replace(/\//g, '-')}_a_${fmtD(S.fC.fim).replace(/\//g, '-')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  });
+});
+
+// ---------------- Alterações de situação ----------------
+const SITX = { regular: 'Regular', cancelada: 'Cancelada', substituida: 'Substituída' };
+async function vAlteracoes() {
+  const f = S.fA || (S.fA = guardado('fAWeb', { per: 'ult3', ini: '', fim: '', para: '', q: '' }));
+  if (f.per !== 'livre') aplicaPeriodo(f);
+  $('#main').innerHTML = `<div class="filtros"><select id="aPer">${opcoes(PERIODOS, f.per)}</select><input type="date" class="data" id="aIni" value="${f.ini}"><input type="date" class="data" id="aFim" value="${f.fim}">
+      <select id="aPara">${opcoes({ '': 'Todas as mudanças', cancelada: 'Passou a cancelada', substituida: 'Passou a substituída', regular: 'Voltou a regular' }, f.para)}</select>
+      <input class="busca" id="aQ" placeholder="Procurar por número, nome ou chave" value="${esc(f.q)}" style="flex:0 1 300px"><span class="dica">Período pela data em que a mudança foi detectada.</span></div>
+    <div class="grade" id="gA"><div class="vazio">Carregando…</div></div>
+    <div class="rodape"><button class="btn" id="aPlan">${ico('excel')} Planilha</button><span class="cont" id="aCont"></span></div>`;
+  const ler = () => { Object.assign(f, { per: $('#aPer').value, ini: $('#aIni').value, fim: $('#aFim').value, para: $('#aPara').value, q: $('#aQ').value }); guardar('fAWeb', f); };
+  $('#aPer').onchange = () => { ler(); if (f.per !== 'livre') { aplicaPeriodo(f); $('#aIni').value = f.ini; $('#aFim').value = f.fim; } carregarAlteracoes(); };
+  ['aIni', 'aFim'].forEach((i) => ($('#' + i).onchange = () => { $('#aPer').value = 'livre'; ler(); carregarAlteracoes(); }));
+  $('#aPara').onchange = () => { ler(); carregarAlteracoes(); };
+  $('#aQ').onkeydown = (e) => { if (e.key === 'Enter') { ler(); carregarAlteracoes(); } };
+  guardar('altVistas', new Date().toISOString()); marcarAbaAlteracoes(0);
+  carregarAlteracoes();
+}
+const carregarAlteracoes = tenta(async () => {
+  const f = S.fA; if (!$('#gA')) return;
+  let q = sb.from('mudancas_situacao').select('*').eq('escritorio_id', S.esc).order('detectado_em', { ascending: false }).limit(3000);
+  if (S.empresaSel !== 'todas') q = q.eq('empresa_doc', S.empresaSel);
+  if (f.ini) q = q.gte('detectado_em', f.ini + 'T00:00:00-03:00');
+  if (f.fim) q = q.lte('detectado_em', f.fim + 'T23:59:59-03:00');
+  if (f.para) q = q.eq('para', f.para);
+  let l = ok(await q);
+  const t = (f.q || '').trim().toLowerCase(), td = so(t);
+  if (t) l = l.filter((x) => [x.numero, x.prest_nome, x.toma_nome].join(' ').toLowerCase().includes(t) || (td.length >= 3 && [x.chave, x.prest_doc, x.toma_doc].join(' ').includes(td)));
+  const chaves = [...new Set(l.map((x) => x.chave))].slice(0, 300);
+  const evs = chaves.length ? ok(await sb.from('eventos').select('chave_nfse,descricao,motivo,dh_evento,codigo').eq('escritorio_id', S.esc).in('chave_nfse', chaves).order('nsu', { ascending: false })) : [];
+  const evPor = new Map(); for (const e of evs) if (!evPor.has(e.chave_nfse)) evPor.set(e.chave_nfse, e);
+  S.alts = l.map((x) => ({ ...x, ev: evPor.get(x.chave) }));
+  $('#aCont').textContent = `${l.length} mudança(s)`;
+  $('#gA').innerHTML = l.length ? `<table><thead><tr><th>Detectada em</th><th>Empresa</th><th>Tipo</th><th>NFS-e</th><th>Competência</th><th>Emitida por / para</th><th class="num">Valor (R$)</th><th>Situação</th><th>Evento / motivo</th></tr></thead><tbody>
+    ${S.alts.map((x, i) => `<tr data-i="${i}"><td>${fmtDH(x.detectado_em)}</td><td>${esc(nomeEmp(x.empresa_doc))}</td><td>${x.tipo === 'emitida' ? 'Emitida' : 'Recebida'}</td><td>${esc(x.numero || '')}</td><td>${fmtComp(x.d_compet)}</td>
+      <td>${x.tipo === 'emitida' ? `<span class="tag t">T</span>${fmtDoc(x.toma_doc)} - ${esc(x.toma_nome)}` : `<span class="tag">P</span>${fmtDoc(x.prest_doc)} - ${esc(x.prest_nome)}`}</td><td class="num">${brl(x.v_serv)}</td>
+      <td>${x.de ? `<span class="pill ${esc(x.de)}">${SITX[x.de] || esc(x.de)}</span> → ` : '<span class="dica">já chegou</span> '}<span class="pill ${esc(x.para)}">${SITX[x.para] || esc(x.para)}</span></td>
+      <td>${x.ev ? `${esc(x.ev.descricao)} <span class="dica">${fmtDH(x.ev.dh_evento)}</span>${x.ev.motivo ? `<div class="dica">${esc(x.ev.motivo)}</div>` : ''}` : ''}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="vazio">Nenhuma nota mudou de situação no período.</div>';
+  $$('#gA tbody tr').forEach((tr) => (tr.ondblclick = tenta(async () => { const x = S.alts[tr.dataset.i];
+    const n = ok(await sb.from('notas').select('*').eq('escritorio_id', S.esc).eq('empresa_doc', x.empresa_doc).eq('chave', x.chave).maybeSingle()); if (n) detalheNota(n); })));
+  $('#aPlan').onclick = tenta(() => {
+    if (!S.alts.length) throw new Error('Nenhuma mudança para a planilha.');
+    const col = [['Detectada em', 'datahora', 16], ['Empresa', '', 34], ['Tipo', '', 10], ['NFS-e', '', 15], ['Competência', 'data', 11], ['Prestador', '', 38], ['Tomador', '', 38], ['Valor (vServ)', 'moeda', 14], ['De', '', 12], ['Para', '', 12], ['Evento', '', 30], ['Data do evento', 'datahora', 16], ['Motivo', '', 50], ['Chave de acesso', '', 52]];
+    salvarArquivo(window.gerarXlsx({ abas: [{ aba: 'Alterações', colunas: col.map(([titulo, tipo, largura]) => ({ titulo, tipo, largura })),
+      linhas: S.alts.map((x) => [x.detectado_em, nomeEmp(x.empresa_doc), x.tipo === 'emitida' ? 'Emitida' : 'Recebida', x.numero, x.d_compet, `${fmtDoc(x.prest_doc)} - ${x.prest_nome || ''}`, `${fmtDoc(x.toma_doc)} - ${x.toma_nome || ''}`,
+        x.v_serv, x.de ? SITX[x.de] : 'Já chegou', SITX[x.para] || x.para, x.ev?.descricao || '', x.ev?.dh_evento || null, x.ev?.motivo || '', x.chave]) }] }),
+      `Alteracoes_situacao_NFSe_${fmtD(S.fA.ini).replace(/\//g, '-')}_a_${fmtD(S.fA.fim).replace(/\//g, '-')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  });
+});
+// aviso na aba: quantas mudanças desde a última visita
+async function contarAlteracoesNovas() {
+  const desde = guardado('altVistas', new Date(Date.now() - 7 * 86400000).toISOString());
+  const { data } = await sb.from('mudancas_situacao').select('id').eq('escritorio_id', S.esc).gt('detectado_em', desde).limit(100);
+  marcarAbaAlteracoes(S.aba === 'alteracoes' ? 0 : (data || []).length);
+}
+function marcarAbaAlteracoes(n) {
+  const b = $('.tab[data-aba=alteracoes] span'); if (!b) return;
+  b.innerHTML = 'Alterações' + (n ? ` <i class="badge">${n > 99 ? '99+' : n}</i>` : '');
+}
+
 // ---------------- usuários do escritório ----------------
 const SITE = location.origin + location.pathname;
 const linkConvite = (c) => `${SITE}#convite=${c.token}&e=${encodeURIComponent(c.email)}`;
-const msgConvite = (c) => `Olá! Você foi convidado para acessar as notas fiscais de serviço do escritório ${S.escInfo?.nome || ''} no Gestius NFS-e. Abra este link para criar a sua senha (use o e-mail ${c.email}): ${linkConvite(c)}\nO link é pessoal e vale 15 dias.`;
+const msgConvite = (c, nomeEsc) => `Olá! Você foi convidado para acessar as notas fiscais de serviço do escritório ${nomeEsc || S.escInfo?.nome || ''} no Gestius NFS-e. Abra este link para criar a sua senha (use o e-mail ${c.email}): ${linkConvite(c)}\nO link é pessoal e vale 15 dias.`;
 async function vUsuarios() {
-  const [mem, conv] = await Promise.all([sb.from('membros').select('*').eq('escritorio_id', S.esc).order('nome'), souAdmin() ? sb.from('convites').select('*').eq('escritorio_id', S.esc).order('criado_em') : { data: [] }]);
+  const [mem, conv] = await Promise.all([sb.from('membros').select('*').eq('escritorio_id', S.esc).order('nome'), S.superu ? sb.from('convites').select('*').eq('escritorio_id', S.esc).order('criado_em') : { data: [] }]);
   const membros = ok(mem), convites = conv.data || [];
-  const nAdm = membros.filter((m) => m.papel === 'admin').length;
-  $('#main').innerHTML = `<div class="grade" style="flex:0 1 auto;min-height:0"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Perfil</th><th>Último acesso</th><th></th></tr></thead><tbody>
+  $('#main').innerHTML = `<div class="secao" style="margin-top:0">Equipe de ${esc(S.escInfo?.nome || '')}</div>
+    <div class="grade" style="flex:0 1 auto;min-height:0"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Último acesso</th><th></th></tr></thead><tbody>
     ${membros.map((m) => `<tr><td>${esc(m.nome || '')}${m.user_id === S.user.id ? ' <span class="pill info">você</span>' : ''}</td><td>${esc(m.email || '')}</td>
       <td>${m.telefone ? `<a class="tel" href="${linkWhats(m.telefone)}" target="_blank" rel="noopener" title="Abrir no WhatsApp">${esc(fmtTel(m.telefone))}</a>` : '<span class="dica">—</span>'}</td>
-      <td>${m.papel === 'admin' ? '<span class="pill ok">Administrador</span>' : '<span class="pill cinza">Operador</span>'}</td><td>${fmtDH(m.ult_acesso) || '<span class="dica">nunca</span>'}</td>
-      <td class="num">${souAdmin() && m.user_id !== S.user.id ? `${m.papel === 'admin' && nAdm <= 1 ? '' : `<button class="btn" style="height:26px" data-papel="${esc(m.user_id)}" data-p="${m.papel === 'admin' ? 'operador' : 'admin'}">Tornar ${m.papel === 'admin' ? 'operador' : 'administrador'}</button>`}
-        <button class="btn perigo" style="height:26px" data-rem="${esc(m.user_id)}" data-nome="${esc(m.nome || m.email)}">Remover</button>` : m.user_id === S.user.id ? '<button class="btn" style="height:26px" data-act="meusDados">Meus dados</button>' : ''}</td></tr>`).join('')}</tbody></table></div>
-    ${souAdmin() ? `<div class="secao">Convidar pessoa do escritório</div>
-      <div class="linha"><input id="cvEmail" type="email" placeholder="e-mail da pessoa" style="width:280px" maxlength="160"><select id="cvPapel"><option value="operador">Operador (só consulta e sincroniza)</option><option value="admin">Administrador (tudo)</option></select>
-      <button class="btn pri" id="cvAdd">${ico('addUser')} Convidar</button></div>
-      <p class="dica">Cada pessoa tem o próprio login e pode usar qualquer computador. Depois de convidar, envie o link pelo WhatsApp ou e-mail. O convite vale 15 dias.</p>
-      ${convites.length ? `<table class="hist"><thead><tr><th style="text-align:left">Convite</th><th style="text-align:left">Perfil</th><th style="text-align:left">Vale até</th><th></th></tr></thead><tbody>${convites.map((c) => `<tr><td>${esc(c.email)}</td><td>${c.papel === 'admin' ? 'Administrador' : 'Operador'}</td><td>${c.expira_em ? fmtD(c.expira_em) : ''}</td>
+      <td>${fmtDH(m.ult_acesso) || '<span class="dica">nunca</span>'}</td>
+      <td class="num">${m.user_id === S.user.id ? '<button class="btn" style="height:26px" data-act="meusDados">Meus dados</button>' : S.superu ? `<button class="btn perigo" style="height:26px" data-rem="${esc(m.user_id)}" data-nome="${esc(m.nome || m.email)}">Remover</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+    ${S.superu ? `<div class="secao">Convidar pessoa para este escritório</div>
+      <div class="linha"><input id="cvEmail" type="email" placeholder="e-mail da pessoa" style="width:280px" maxlength="160"><button class="btn pri" id="cvAdd">${ico('addUser')} Convidar</button></div>
+      <p class="dica">A pessoa entra como operadora (consulta, sincroniza, cadastra empresas e usa o conector). Para quem já se cadastrou e está aguardando, use <b>Administração → Pessoas</b>.</p>
+      ${convites.length ? `<table class="hist"><thead><tr><th style="text-align:left">Convite</th><th style="text-align:left">Vale até</th><th></th></tr></thead><tbody>${convites.map((c) => `<tr><td>${esc(c.email)}</td><td>${c.expira_em ? fmtD(c.expira_em) : ''}</td>
         <td class="num"><button class="btn" style="height:26px" data-cvlink="${esc(c.token)}">Copiar link</button> <a class="btn" style="height:26px" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msgConvite(c))}">WhatsApp</a>
-        <button class="btn" style="height:26px" data-cvrem="${esc(c.email)}">Cancelar</button></td></tr>`).join('')}</tbody></table>` : ''}` : '<p class="dica" style="margin-top:12px">Para convidar pessoas ou mudar perfis, fale com um administrador do escritório.</p>'}`;
+        <button class="btn" style="height:26px" data-cvrem="${esc(c.email)}">Cancelar</button></td></tr>`).join('')}</tbody></table>` : ''}`
+      : '<p class="dica" style="margin-top:12px">Para incluir ou remover pessoas do escritório, fale com o administrador do site.</p>'}`;
   $('#cvAdd')?.addEventListener('click', tenta(async () => {
     const email = $('#cvEmail').value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) throw new Error('E-mail inválido.');
-    const r = await sb.from('convites').upsert({ escritorio_id: S.esc, email, papel: $('#cvPapel').value }, { onConflict: 'escritorio_id,email' });
-    if (r.error) throw r.error;
-    const c = ok(await sb.from('convites').select('email,token').eq('escritorio_id', S.esc).eq('email', email).single());
-    await vUsuarios();
-    const d = dialogo({ titulo: 'Convite criado', tamanho: 'sm', corpo: `<p style="margin:0 0 10px">Envie o link para <b>${esc(email)}</b>. A pessoa cria a senha e entra direto neste escritório.</p>
-      <textarea id="cvTxt" readonly rows="6" style="width:100%">${esc(msgConvite(c))}</textarea><p class="dica" style="margin:6px 0 0">O link é pessoal: só funciona com o e-mail ${esc(email)}.</p>`,
-      rodape: `<button class="btn" data-copiar>Copiar mensagem</button><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msgConvite(c))}">Enviar pelo WhatsApp</a>` });
-    $('[data-copiar]', d.el).onclick = async (e) => { try { await navigator.clipboard.writeText(msgConvite(c)); } catch { $('#cvTxt', d.el).select(); document.execCommand('copy'); } e.target.textContent = 'Copiado!'; };
+    await mostrarConvite(S.esc, S.escInfo?.nome, email); vUsuarios();
   }));
   $$('[data-cvlink]').forEach((b) => (b.onclick = async () => { try { await navigator.clipboard.writeText(msgConvite(convites.find((x) => x.token === b.dataset.cvlink))); b.textContent = 'Copiado!'; } catch { toast('Não foi possível copiar.', 'erro'); } }));
   $$('[data-cvrem]').forEach((b) => (b.onclick = tenta(async () => { ok(await sb.from('convites').delete().eq('escritorio_id', S.esc).eq('email', b.dataset.cvrem)); vUsuarios(); })));
-  $$('[data-papel]').forEach((b) => (b.onclick = tenta(async () => { ok(await sb.from('membros').update({ papel: b.dataset.p }).eq('escritorio_id', S.esc).eq('user_id', b.dataset.papel)); toast('Perfil alterado.', 'ok'); vUsuarios(); })));
   $$('[data-rem]').forEach((b) => (b.onclick = () => confirmar(`Remover ${b.dataset.nome}?`, 'A pessoa perde o acesso a este escritório na hora. A conta dela continua existindo.', 'Remover',
-    tenta(async () => { ok(await sb.from('membros').delete().eq('escritorio_id', S.esc).eq('user_id', b.dataset.rem)); toast('Pessoa removida.', 'ok'); vUsuarios(); }))));
+    tenta(async () => { ok(await sb.rpc('admin_desvincular', { p_user: b.dataset.rem, p_escritorio: S.esc })); toast('Pessoa removida.', 'ok'); vUsuarios(); }))));
+}
+// convite (só o administrador do site): cria/renova e mostra a mensagem pronta
+async function mostrarConvite(escId, escNome, email) {
+  const r = await sb.from('convites').upsert({ escritorio_id: escId, email, papel: 'operador' }, { onConflict: 'escritorio_id,email' });
+  if (r.error) throw r.error;
+  const c = ok(await sb.from('convites').select('email,token').eq('escritorio_id', escId).eq('email', email).single());
+  const msg = msgConvite(c, escNome);
+  const d = dialogo({ titulo: 'Convite criado', tamanho: 'sm', corpo: `<p style="margin:0 0 10px">Envie o link para <b>${esc(email)}</b>. A pessoa cria a senha e entra direto em <b>${esc(escNome || '')}</b>.</p>
+    <textarea id="cvTxt" readonly rows="6" style="width:100%">${esc(msg)}</textarea><p class="dica" style="margin:6px 0 0">O link é pessoal: só funciona com o e-mail ${esc(email)} e vale 15 dias.</p>`,
+    rodape: `<button class="btn" data-copiar>Copiar mensagem</button><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Enviar pelo WhatsApp</a>` });
+  $('[data-copiar]', d.el).onclick = async (e) => { try { await navigator.clipboard.writeText(msg); } catch { $('#cvTxt', d.el).select(); document.execCommand('copy'); } e.target.textContent = 'Copiado!'; };
 }
 ACOES.meusDados = () => {
   const eu = S.membros.find((m) => m.escritorio_id === S.esc) || {};
   const d = dialogo({ titulo: 'Meus dados', tamanho: 'sm', corpo: `<div class="form" style="grid-template-columns:110px 1fr"><label>Nome</label><input id="mdNome" maxlength="120" value="${esc(eu.nome || '')}">
       <label>Telefone</label><input id="mdTel" inputmode="tel" maxlength="15" placeholder="(79) 99999-9999" value="${esc(fmtTel(eu.telefone || ''))}"><label>E-mail</label><input value="${esc(S.user.email)}" readonly></div>
-      <p class="dica">Para trocar o e-mail, crie uma conta nova e peça um convite ao administrador.</p>`,
+      <p class="dica">Para trocar o e-mail, crie uma conta nova e peça ao administrador do site para incluir a nova conta no escritório.</p>`,
     rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Salvar</button>' });
   $('#mdTel', d.el).oninput = (e) => { e.target.value = fmtTel(e.target.value); };
   $('[data-ok]', d.el).onclick = tenta(async () => {
@@ -648,22 +897,61 @@ function vApoie() {
 // ---------------- administração do site ----------------
 async function vAdmin() {
   $('#main').innerHTML = '<div class="vazio">Carregando…</div>';
-  const r = ok(await sb.rpc('admin_resumo')), t = r.totais;
+  const [r, pes] = await Promise.all([sb.rpc('admin_resumo').then(ok), sb.rpc('admin_usuarios').then(ok)]);
+  const t = r.totais, aba = S.admAba || 'pessoas', aguard = pes.filter((u) => !u.escritorios.length && !u.super);
   const card = (k, v) => `<div class="card"><span>${k}</span><b>${v}</b></div>`;
-  $('#main').innerHTML = `<div class="cards">${card('Escritórios', t.escritorios)}${card('Ativos em 7 dias', t.ativos7d)}${card('PCs enviando (2h)', t.pcs)}${card('Usuários', t.usuarios)}${card('Empresas', t.empresas)}${card('Notas', Number(t.notas).toLocaleString('pt-BR'))}</div>
-    <div class="grade" style="flex:1 1 320px"><table><thead><tr><th>Escritório</th><th>Responsável</th><th>Contato</th><th>Criado</th><th class="num">Usuários</th><th class="num">Empresas</th><th class="num">Notas</th><th>Último acesso</th><th>PC</th><th>Última sincronização</th><th class="cen">Situação</th></tr></thead><tbody>
+  const escOpts = r.escritorios.map((e) => `<option value="${esc(e.id)}">${esc(e.nome)}${e.ativo ? '' : ' (suspenso)'}</option>`).join('');
+  const seg = `<div class="seg-tabs">${[['pessoas', `Pessoas${aguard.length ? ` <span class="pill vence">${aguard.length} aguardando</span>` : ''}`], ['escritorios', 'Escritórios'], ['acessos', 'Últimos acessos']]
+    .map(([k, txt]) => `<button class="${aba === k ? 'on' : ''}" data-adm="${k}">${txt}</button>`).join('')}</div>`;
+  let corpo = '';
+  if (aba === 'pessoas') {
+    const f = (S.admQ || '').toLowerCase();
+    const lista = pes.filter((u) => !f || [u.nome, u.email, u.telefone, u.escritorio_informado, ...u.escritorios.map((e) => e.nome)].join(' ').toLowerCase().includes(f))
+      .sort((x, y) => (!x.escritorios.length && !x.super ? 0 : 1) - (!y.escritorios.length && !y.super ? 0 : 1));
+    corpo = `<div class="filtros"><input class="busca" id="admQ" placeholder="Procurar por nome, e-mail, telefone ou escritório" value="${esc(S.admQ || '')}" style="flex:0 1 420px">
+      <button class="btn" id="admNovoEsc">Novo escritório</button><span class="dica">Todas as pessoas dos escritórios são operadoras: consultam, sincronizam, cadastram empresas e usam o conector. Só você gerencia pessoas.</span></div>
+      <div class="grade" style="flex:1 1 320px"><table><thead><tr><th>Pessoa</th><th>Telefone</th><th>Escritório</th><th>Cadastro</th><th>Último login</th><th style="width:360px"></th></tr></thead><tbody>
+      ${lista.map((u) => `<tr><td><b>${esc(u.nome || '')}</b>${u.super ? ' <span class="pill ok">administrador do site</span>' : ''}<div class="dica">${esc(u.email)}</div></td>
+        <td>${u.telefone ? `<a class="tel" href="${linkWhats(u.telefone)}" target="_blank" rel="noopener">${esc(fmtTel(u.telefone))}</a>` : '<span class="dica">—</span>'}</td>
+        <td>${u.escritorios.length ? u.escritorios.map((e) => `<span class="pill ${e.ativo ? 'info' : 'cinza'}" style="margin:1px 4px 1px 0">${esc(e.nome)}${u.super ? '' : ` <a class="x-mini" title="Tirar deste escritório" data-desv="${esc(u.user_id)}" data-esc="${esc(e.id)}" data-nome="${esc(u.nome || u.email)}" data-escn="${esc(e.nome)}">×</a>`}</span>`).join('')
+          : `<span class="pill vence">aguardando</span>${u.escritorio_informado ? `<div class="dica">informou: ${esc(u.escritorio_informado)}</div>` : ''}`}</td>
+        <td>${fmtD(u.criado_em)}</td><td>${fmtDH(u.ult_login) || '<span class="dica">nunca</span>'}</td>
+        <td class="num">${u.super ? '' : `<select class="selemp" data-vsel="${esc(u.user_id)}" style="width:170px;min-width:0"><option value="">Incluir no escritório…</option>${escOpts}</select>
+          ${!u.escritorios.length ? `<button class="btn" style="height:26px" data-criar="${esc(u.user_id)}" data-sug="${esc(u.escritorio_informado || '')}">Criar escritório</button>` : ''}`}</td></tr>`).join('')}</tbody></table></div>`;
+  } else if (aba === 'escritorios') {
+    corpo = `<div class="grade" style="flex:1 1 320px"><table><thead><tr><th>Escritório</th><th>Quem cadastrou</th><th>Contato</th><th>Criado</th><th class="num">Pessoas</th><th class="num">Empresas</th><th class="num">Notas</th><th>Último acesso</th><th>Conector</th><th>Última sincronização</th><th class="cen" style="width:230px"></th></tr></thead><tbody>
     ${r.escritorios.map((e) => { const on = e.pc_visto_em && Date.now() - new Date(e.pc_visto_em) < 2 * 3600000;
-      return `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.responsavel || '')}<div class="dica">${esc(e.email || '')}</div></td><td>${e.telefone ? `<a class="tel" href="${linkWhats(e.telefone)}" target="_blank" rel="noopener">${esc(fmtTel(e.telefone))}</a>` : '<span class="dica">—</span>'}</td><td>${fmtD(e.criado_em)}</td><td class="num">${e.usuarios}</td><td class="num">${e.empresas}</td><td class="num">${Number(e.notas).toLocaleString('pt-BR')}</td>
+      return `<tr class="${e.ativo ? '' : 'inativo'}"><td><b>${esc(e.nome)}</b></td><td>${esc(e.responsavel || '')}<div class="dica">${esc(e.email || '')}</div></td><td>${e.telefone ? `<a class="tel" href="${linkWhats(e.telefone)}" target="_blank" rel="noopener">${esc(fmtTel(e.telefone))}</a>` : '<span class="dica">—</span>'}</td><td>${fmtD(e.criado_em)}</td><td class="num">${e.usuarios}</td><td class="num">${e.empresas}</td><td class="num">${Number(e.notas).toLocaleString('pt-BR')}</td>
       <td>${fmtDH(e.ult_acesso)}</td><td><span class="agente-st ${on ? 'on' : 'off'}"><i></i>${e.pc_visto_em ? fmtDH(e.pc_visto_em) : 'nunca'}</span></td>
       <td>${fmtDH(e.ult_sync)}${e.com_erro ? ` <span class="pill erro">${e.com_erro} com erro</span>` : ''}</td>
-      <td class="cen"><button class="btn" style="height:26px" data-esc="${esc(e.id)}" data-at="${e.ativo ? 0 : 1}">${e.ativo ? 'Suspender' : 'Reativar'}</button></td></tr>`; }).join('')}</tbody></table></div>
-    <div class="secao" style="margin:4px 0 0">Últimos acessos</div>
-    <div class="grade" style="flex:0 1 240px;min-height:160px"><table><thead><tr><th>Quando</th><th>Pessoa</th><th>Escritório</th><th>IP</th><th>Navegador</th></tr></thead><tbody>
-    ${r.acessos.map((a) => `<tr><td>${fmtDH(a.quando)}</td><td>${esc(a.nome || '')} <span class="dica">${esc(a.email || '')}</span></td><td>${esc(a.escritorio || '')}</td><td class="mono">${esc(a.ip || '')}</td><td title="${esc(a.navegador)}">${esc((a.navegador || '').slice(0, 60))}</td></tr>`).join('')}</tbody></table></div>
-    <div class="dica">Banco: ${t.banco_mb} MB de 500 MB do plano gratuito.</div>`;
-  $$('[data-esc]').forEach((b) => (b.onclick = () => confirmar(b.dataset.at === '1' ? 'Reativar escritório?' : 'Suspender escritório?',
-    b.dataset.at === '1' ? 'As pessoas voltam a entrar e o PC volta a publicar.' : 'As pessoas desse escritório não conseguem ver os dados e o PC para de publicar. Os dados ficam guardados.',
-    b.dataset.at === '1' ? 'Reativar' : 'Suspender', tenta(async () => { ok(await sb.rpc('admin_definir_ativo', { p_escritorio: b.dataset.esc, p_ativo: b.dataset.at === '1' })); vAdmin(); }))));
+      <td class="cen"><button class="btn" style="height:26px" data-conv="${esc(e.id)}" data-escn="${esc(e.nome)}">Convidar</button> <button class="btn" style="height:26px" data-ren="${esc(e.id)}" data-escn="${esc(e.nome)}">Renomear</button>
+        <button class="btn" style="height:26px" data-esc-at="${esc(e.id)}" data-at="${e.ativo ? 0 : 1}">${e.ativo ? 'Suspender' : 'Reativar'}</button></td></tr>`; }).join('')}</tbody></table></div>`;
+  } else {
+    corpo = `<div class="grade" style="flex:1 1 320px"><table><thead><tr><th>Quando</th><th>Pessoa</th><th>Escritório</th><th>IP</th><th>Navegador</th></tr></thead><tbody>
+    ${r.acessos.map((a) => `<tr><td>${fmtDH(a.quando)}</td><td>${esc(a.nome || '')} <span class="dica">${esc(a.email || '')}</span></td><td>${esc(a.escritorio || '')}</td><td class="mono">${esc(a.ip || '')}</td><td title="${esc(a.navegador)}">${esc((a.navegador || '').slice(0, 60))}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  $('#main').innerHTML = `<div class="cards">${card('Escritórios', t.escritorios)}${card('Ativos em 7 dias', t.ativos7d)}${card('Conectores ativos (2h)', t.pcs)}${card('Pessoas', pes.length)}${card('Empresas', t.empresas)}${card('Notas', Number(t.notas).toLocaleString('pt-BR'))}</div>
+    ${seg}${corpo}<div class="dica">Banco: ${t.banco_mb} MB de 500 MB do plano gratuito.</div>`;
+  $$('[data-adm]').forEach((b) => (b.onclick = () => { S.admAba = b.dataset.adm; vAdmin(); }));
+  const q = $('#admQ'); if (q) q.oninput = () => { clearTimeout(S.tmAdm); S.tmAdm = setTimeout(() => { S.admQ = q.value; vAdmin().then(() => { const n = $('#admQ'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); }, 350); };
+  $('#admNovoEsc')?.addEventListener('click', () => pedirTexto('Novo escritório', 'Nome do escritório', '', tenta(async (nome) => { ok(await sb.rpc('admin_criar_escritorio', { p_nome: nome })); toast('Escritório criado.', 'ok'); vAdmin(); })));
+  $$('[data-vsel]').forEach((sel) => (sel.onchange = tenta(async () => { if (!sel.value) return; ok(await sb.rpc('admin_vincular', { p_user: sel.dataset.vsel, p_escritorio: sel.value })); toast('Pessoa incluída no escritório.', 'ok'); vAdmin(); })));
+  $$('[data-criar]').forEach((b) => (b.onclick = () => pedirTexto('Criar escritório para esta pessoa', 'Nome do escritório', b.dataset.sug, tenta(async (nome) => { ok(await sb.rpc('admin_criar_escritorio', { p_nome: nome, p_user: b.dataset.criar })); toast('Escritório criado e pessoa incluída.', 'ok'); vAdmin(); }))));
+  $$('[data-desv]').forEach((b) => (b.onclick = () => confirmar(`Tirar ${b.dataset.nome} de ${b.dataset.escn}?`, 'A pessoa perde o acesso a esse escritório na hora. A conta continua existindo.', 'Tirar',
+    tenta(async () => { ok(await sb.rpc('admin_desvincular', { p_user: b.dataset.desv, p_escritorio: b.dataset.esc })); vAdmin(); }))));
+  $$('[data-conv]').forEach((b) => (b.onclick = () => pedirTexto(`Convidar para ${b.dataset.escn}`, 'E-mail da pessoa', '', tenta(async (email) => {
+    email = email.trim().toLowerCase(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) throw new Error('E-mail inválido.'); await mostrarConvite(b.dataset.conv, b.dataset.escn, email); }))));
+  $$('[data-ren]').forEach((b) => (b.onclick = () => pedirTexto('Renomear escritório', 'Nome do escritório', b.dataset.escn, tenta(async (nome) => { ok(await sb.rpc('admin_renomear_escritorio', { p_escritorio: b.dataset.ren, p_nome: nome })); vAdmin(); }))));
+  $$('[data-esc-at]').forEach((b) => (b.onclick = () => confirmar(b.dataset.at === '1' ? 'Reativar escritório?' : 'Suspender escritório?',
+    b.dataset.at === '1' ? 'As pessoas voltam a entrar e o conector volta a publicar.' : 'As pessoas desse escritório não conseguem ver os dados e o conector para de publicar. Os dados ficam guardados.',
+    b.dataset.at === '1' ? 'Reativar' : 'Suspender', tenta(async () => { ok(await sb.rpc('admin_definir_ativo', { p_escritorio: b.dataset.escAt, p_ativo: b.dataset.at === '1' })); vAdmin(); }))));
+}
+function pedirTexto(titulo, rotulo, valor, fn) {
+  const d = dialogo({ titulo, tamanho: 'sm', corpo: `<label style="display:grid;gap:6px">${esc(rotulo)}<input id="ptVal" maxlength="160" value="${esc(valor || '')}"></label>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>OK</button>' });
+  const i = $('#ptVal', d.el); i.focus(); i.select();
+  const ir = async () => { if (!i.value.trim()) return; d.fechar(); await fn(i.value.trim()); };
+  $('[data-ok]', d.el).onclick = ir; i.onkeydown = (e) => { if (e.key === 'Enter') ir(); };
 }
 
 // ---------------- histórico, menu ----------------
@@ -679,7 +967,7 @@ ACOES.menuUsuario = (el) => {
   $('.menu')?.remove();
   const r = el.getBoundingClientRect(), m = document.createElement('div'); m.className = 'menu';
   m.style.top = r.bottom + 4 + 'px'; m.style.right = innerWidth - r.right + 'px';
-  m.innerHTML = `<div style="padding:6px 14px 8px"><b>${esc(S.membros.find((x) => x.escritorio_id === S.esc)?.nome || '')}</b><div class="dica">${esc(S.user.email)} · ${souAdmin() ? 'administrador' : 'operador'}${S.superu ? ' · administrador do site' : ''}</div></div><hr>
+  m.innerHTML = `<div style="padding:6px 14px 8px"><b>${esc(S.membros.find((x) => x.escritorio_id === S.esc)?.nome || '')}</b><div class="dica">${esc(S.user.email)} · operador${S.superu ? ' · administrador do site' : ''}</div></div><hr>
     <button data-m="dados">Meus dados</button><button data-m="senha">Trocar minha senha</button><button data-m="sair">Sair</button>`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', function f(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('click', f); } }), 0);

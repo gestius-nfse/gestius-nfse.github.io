@@ -302,3 +302,14 @@ a.tel:hover{text-decoration:underline}
 textarea{border:1px solid var(--line);border-radius:4px;padding:8px;resize:vertical;font-size:12.5px}
 @media (max-width:560px){.login .caixa{padding:22px 18px}}
 a.btn{text-decoration:none}
+
+/* ---------- 3.5: administração, conferência, alterações ---------- */
+.seg-tabs{display:flex;gap:4px;margin:10px 0 8px;border-bottom:1px solid var(--line)}
+.seg-tabs button{border:0;background:none;padding:8px 14px;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;margin-bottom:-1px}
+.seg-tabs button.on{color:var(--navy);border-bottom-color:var(--gold)}
+.tab .badge{display:inline-block;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#c5221f;color:#fff;font-style:normal;font-size:10px;line-height:16px;text-align:center;vertical-align:1px;margin-left:2px}
+a.x-mini{cursor:pointer;margin-left:4px;color:#888;text-decoration:none;font-weight:700}
+a.x-mini:hover{color:#c5221f}
+.ok-ico{color:#1e8e3e;width:14px;height:14px;vertical-align:-2px}
+.form{display:grid;gap:8px 12px;align-items:center}
+.form .linha{display:flex;gap:8px;align-items:center}
