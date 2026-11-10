@@ -53,6 +53,7 @@ I.admin = '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.
 I.pasta = '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>';
 I.conferir = '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/><path d="m8 11 2 2 4-4"/>';
 I.alteracoes = '<path d="M4 8h13l-3-3M20 16H7l3 3"/>';
+I.colunas = '<path d="M4 5h16v14H4zM9.5 5v14M14.5 5v14"/>';
 I.usuarios = '<path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M2.5 20c.5-3.4 3.2-5.5 6.5-5.5s6 2.1 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14.6c2 .7 3.3 2.6 3.5 5.4"/>';
 const CFG = window.GESTIUS || {};
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnon, { auth: { persistSession: true, autoRefreshToken: true } });
@@ -134,6 +135,15 @@ ACOES.conectarPc = () => {
   $('[data-ok]', d.el).onclick = ir; $('#cxSenha', d.el).onkeydown = (e) => { if (e.key === 'Enter') ir(); };
 };
 // pede ao conector do escritório (que pode estar em outro computador) e espera o resultado
+// versão do conector que este site precisa (pasta, Zip, DANFSe em lote, atualização automática)
+const CONECTOR_MIN = '3.6.0';
+const versaoMaior = (a, b) => { const x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+const conectorDesatualizado = (v) => !!v && versaoMaior(CONECTOR_MIN, v);
+const versaoConector = () => (conectorAqui() ? S.conector?.versao : S.cfgConector?.versao) || '';
+function exigirConectorNovo() {
+  const v = versaoConector();
+  if (!v || conectorDesatualizado(v)) throw new Error(`O conector do escritório está desatualizado${v ? ` (versão ${v})` : ''}. No computador dos certificados, abra este site e clique em "Atualizar o conector" (aba Empresas). Depois disso ele se atualiza sozinho.`);
+}
 async function comando(tipo, dados = {}, msgEspera = 'Enviando ao conector…') {
   const c = ok(await sb.from('comandos').insert({ escritorio_id: S.esc, tipo, dados, criado_por: S.user.id }).select('id').single());
   if (conectorAqui()) chamarConector('/ponte/acordar', { method: 'POST', tempo: 5000 }).catch(() => {});
@@ -142,7 +152,7 @@ async function comando(tipo, dados = {}, msgEspera = 'Enviando ao conector…') 
     await new Promise((r) => setTimeout(r, 2500));
     const x = ok(await sb.from('comandos').select('status,resultado').eq('id', c.id).single());
     if (x.status === 'ok') return x.resultado || {};
-    if (x.status === 'erro') throw new Error((x.resultado && x.resultado.erro) || 'O conector não conseguiu executar.');
+    if (x.status === 'erro') { const m = (x.resultado && x.resultado.erro) || 'O conector não conseguiu executar.'; throw new Error(/desconhecido/i.test(m) ? 'O conector do escritório está desatualizado: atualize-o pela aba Empresas, no computador dos certificados.' : m); }
   }
   throw new Error('O conector não respondeu. Confira se o computador com os certificados está ligado.');
 }
@@ -169,6 +179,7 @@ function campoSenha(nome, rotulo, auto) {
 function telaLogin(modo = 'login', aviso = '') {
   const cl = conviteLink(), convite = cl?.email || '';
   if (cl && modo === 'login' && !aviso) modo = 'convidado';
+  if (modo === 'convidado' && !cl) modo = 'cadastro';
   const cad = modo === 'cadastro' || modo === 'convidado', conv = modo === 'convidado', rec = modo === 'recuperar', nova = modo === 'novasenha';
   $('#app').innerHTML = `<div class="login"><form class="caixa" id="fLogin" novalidate>
     <div class="wm"><b>GESTIUS</b><span>NFS-E</span></div>
@@ -176,7 +187,6 @@ function telaLogin(modo = 'login', aviso = '') {
     <p>${conv ? (cl ? 'Você recebeu um convite. Crie a sua senha para acessar as notas do escritório.' : 'Crie a sua conta. O administrador do site inclui você no escritório (ou use o link de convite que recebeu).')
       : cad ? 'As NFS-e de todas as suas empresas, baixadas do Ambiente Nacional, num só lugar.' : rec ? 'Enviaremos um link para o seu e-mail.' : nova ? 'Escolha a nova senha.' : 'Notas fiscais de serviço de todas as suas empresas, num só lugar.'}</p>
     ${aviso ? `<div class="faixa ok-faixa" style="margin-bottom:12px">${esc(aviso)}</div>` : ''}
-    ${cad ? `<div class="seg" role="tablist"><button type="button" class="${conv ? '' : 'on'}" data-ir="cadastro">Criar escritório novo</button><button type="button" class="${conv ? 'on' : ''}" data-ir="convidado">Meu escritório já usa</button></div>` : ''}
     ${cad && !conv ? '<label>Nome do escritório ou da empresa<input name="escritorio" required maxlength="120" autocomplete="organization"></label>' : ''}
     ${cad ? `<label>Seu nome completo<input name="nome" required maxlength="120" autocomplete="name"></label>
       <label>Telefone com DDD (WhatsApp)<input name="telefone" required inputmode="tel" autocomplete="tel-national" placeholder="(79) 99999-9999" maxlength="15"></label>` : ''}
@@ -187,7 +197,6 @@ function telaLogin(modo = 'login', aviso = '') {
     <div class="erro-txt" id="loginErro" style="min-height:18px;margin:-4px 0 8px"></div>
     <button class="btn ${cad ? 'ouro' : 'pri'}" type="submit">${conv ? 'Criar conta e entrar no escritório' : cad ? 'Criar conta grátis' : rec ? 'Enviar link' : nova ? 'Salvar senha' : 'Entrar'}</button>
     <div class="troca">${cad ? 'Já tem conta? <a data-ir="login">Entrar</a>' : rec || nova ? '<a data-ir="login">Voltar</a>' : 'Ainda não tem conta? <a data-ir="cadastro">Criar conta grátis</a><br><a data-ir="recuperar" style="font-weight:400">Esqueci a senha</a>'}</div>
-    ${conv ? '<p class="dica" style="text-align:center;margin:10px 0 0">Depois de criar a conta, avise o administrador do site para incluir você no escritório.</p>' : ''}
     <div class="assin">DECISÕES SEGURAS, GESTÃO INTELIGENTE.</div>
   </form></div>`;
   const f = $('#fLogin');
@@ -311,6 +320,7 @@ function statusPc() {
 }
 async function carregarEmpresas() {
   S.empresas = ok(await sb.from('empresas').select('*').eq('escritorio_id', S.esc).order('nome'));
+  carregarCfgConector().catch(() => {});
   const sel = $('#selEmp');
   if (S.empresaSel !== 'todas' && !S.empresas.some((e) => e.doc === S.empresaSel)) S.empresaSel = 'todas';
   sel.innerHTML = '<option value="todas">Todas as empresas</option>' + S.empresas.map((e) => `<option value="${e.doc}" ${e.doc === S.empresaSel ? 'selected' : ''}>${esc(e.nome)} — ${fmtDoc(e.doc)}</option>`).join('');
@@ -332,9 +342,11 @@ function vEmpresas() {
       1. Nesse computador, abra este site e clique em <a class="btn ouro" style="height:26px;margin:0 4px" href="${LINK_INSTALADOR}" download>Baixar o instalador</a><br>
       2. Abra o arquivo baixado. Se o Windows avisar, clique em <b>Mais informações → Executar assim mesmo</b>.<br>
       3. Volte ao site e clique em <b>Conectar este computador</b> (no rodapé). Se o navegador pedir acesso à rede local, clique em <b>Permitir</b>.</div>`
-      : semPc ? '<div class="faixa">O conector ainda não foi instalado no computador do escritório que tem os certificados.</div>' : ''}
+      : semPc ? '<div class="faixa">O conector ainda não foi instalado no computador do escritório que tem os certificados.</div>'
+      : conectorDesatualizado(versaoConector()) ? `<div class="faixa" style="display:block;line-height:1.7"><b>O conector ${conectorAqui() ? 'deste computador' : 'do escritório'} está desatualizado (versão ${esc(versaoConector())}).</b> Pasta dos XML, Preferências, Zip e DANFSe em lote precisam da versão ${CONECTOR_MIN}.<br>
+          ${conectorAqui() ? `Clique em <a class="btn ouro" style="height:26px;margin:0 4px" href="${LINK_INSTALADOR}" download>Atualizar o conector</a>, abra o arquivo baixado e depois clique em <b>Conectar este computador</b>. É a última vez: a partir dessa versão ele se atualiza sozinho.` : 'No computador que tem os certificados, abra este site e clique em "Atualizar o conector".'}</div>` : ''}
     ${!semPc ? `<div class="filtros">${podeOperar() ? `<button class="btn pri" data-act="cadastrarCerts">${ico('certs')} Cadastrar pelos certificados</button>` : ''}
-      <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><button class="btn" data-act="prefsConector">${ico('pasta')} Pasta e downloads</button>
+      <button class="btn" data-act="syncTodas">${ico('sync')} Sincronizar agora</button><button class="btn" data-act="prefsConector">${ico('pasta')} Preferências</button>
       ${conectorAqui() ? `<button class="btn" data-act="abrirPasta">${ico('pasta')} Abrir pasta dos XML</button>` : ''}<span class="dica">Os pedidos vão para o conector do escritório e levam alguns segundos.</span></div>` : ''}
     <div class="grade" id="gEmp">${S.empresas.length ? `<table><thead><tr><th style="width:44%">Empresa</th><th class="cen">Validade do certificado</th><th class="num">Notas</th><th>Última sincronização</th>${podeOperar() && (S.escInfo?.pc_visto_em || conectorAqui()) ? '<th style="width:130px"></th>' : ''}</tr></thead><tbody>
     ${S.empresas.map((e) => { const d = e.cert_validade ? diasAte(e.cert_validade) : null;
@@ -344,6 +356,7 @@ function vEmpresas() {
       <td class="num">${(e.qtd_notas || 0).toLocaleString('pt-BR')}</td>
       <td>${e.ult_sync ? `<span class="sinc ${st}" title="${esc(e.ult_msg || '')}">${ico(st, 'ico')} ${fmtDH(e.ult_sync)}${st === 'erro' ? ` <span class="erro-txt">${esc((e.ult_msg || '').slice(0, 70))}</span>` : ''}</span>` : '<span class="dica">nunca</span>'}</td></tr>`; }).join('')}
     </tbody></table>` : '<div class="vazio">Nenhuma empresa publicada ainda.</div>'}</div>`;
+  $$('#gEmp tbody tr').forEach((tr) => (tr.oncontextmenu = (ev) => menuEmpresa(ev, S.empresas.find((x) => x.doc === tr.dataset.doc))));
   $$('#gEmp tbody tr').forEach((tr) => (tr.ondblclick = () => { S.empresaSel = tr.dataset.doc; guardar('empresaSelWeb', S.empresaSel); carregarEmpresas(); irPara('notas'); }));
   if (podeOperar() && !semPc) $$('#gEmp tbody tr').forEach((tr) => {
     const e = S.empresas.find((x) => x.doc === tr.dataset.doc);
@@ -361,6 +374,7 @@ function atualizarDepois(ms = 8000) { setTimeout(async () => { await carregarEmp
 ACOES.syncTodas = async () => { const r = await comando('sync', {}, 'Pedindo a sincronização…'); toast(`Sincronizando ${r.enfileiradas || 0} empresa(s).`, 'ok'); atualizarDepois(); };
 // ---------- pasta dos XML e preferências do conector ----------
 async function abrirPastaConector(doc) {
+  exigirConectorNovo();
   const { data: { session } } = await sb.auth.getSession();
   const r = await chamarConector('/ponte/abrir' + (doc ? `?doc=${doc}` : ''), { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token }, tempo: 10000 });
   const j = await r.json(); toast(`Pasta aberta: ${j.pasta}`, 'ok');
@@ -368,35 +382,69 @@ async function abrirPastaConector(doc) {
 ACOES.abrirPasta = () => abrirPastaConector('');
 const SUBPASTAS = { 'empresa/ano/mes/tipo': 'Empresa / AAAA / MM / Tipo', 'empresa/tipo/ano/mes': 'Empresa / Tipo / AAAA / MM', 'empresa/ano/mes': 'Empresa / AAAA / MM', 'empresa/tipo': 'Empresa / Tipo' };
 const FREQ = { 0: 'Só quando pedir', 30: 'A cada 30 minutos', 60: 'A cada 1 hora', 120: 'A cada 2 horas', 240: 'A cada 4 horas', diario: 'Uma vez por dia' };
-ACOES.prefsConector = async () => {
+async function carregarCfgConector() {
   const { data } = await sb.from('conector_config').select('cfg,atualizado_em').eq('escritorio_id', S.esc).maybeSingle();
-  if (!data) throw new Error('O conector ainda não enviou as preferências. Ele envia ao conectar e a cada 30 minutos (atualize o conector se for uma versão antiga).');
-  const c = data.cfg || {};
-  const d = dialogo({ titulo: 'Pasta e downloads (computador do conector)', tamanho: 'lg', corpo: `
-    <p class="dica" style="margin:0 0 10px">Valem para o computador ${esc(c.host || 'do conector')}. Os XML de cada empresa são gravados sozinhos nesta pasta a cada sincronização.</p>
-    <div class="form" style="grid-template-columns:150px 1fr">
-      <label>Pasta geral</label><input id="pcPasta" value="${esc(c.pasta_xml || '')}" placeholder="C:\\Gestius NFS-e\\XML">
-      <label>Subpastas</label><select id="pcSub">${opcoes(SUBPASTAS, c.subpastas)}</select>
-      <label>Emitidas</label><input id="pcEm" value="${esc(c.pasta_emitidas || 'Emitidas')}" maxlength="60">
-      <label>Recebidas</label><input id="pcRe" value="${esc(c.pasta_recebidas || 'Recebidas')}" maxlength="60">
-      <label>Eventos</label><input id="pcEv" value="${esc(c.pasta_eventos || 'Eventos')}" maxlength="60">
-      <label>Ano/mês pela</label><select id="pcAm">${opcoes({ competencia: 'Data de competência', geracao: 'Data de geração' }, c.anomes_pela)}</select>
-      <label>PDF (DANFSe)</label><label class="chk"><input type="checkbox" id="pcPdf" ${c.gravar_pdf === '1' ? 'checked' : ''}> Gravar também o PDF ao lado de cada XML de nota</label>
-      <label>Baixar sozinho</label><div class="linha"><select id="pcFreq">${opcoes(FREQ, c.frequencia)}</select><input id="pcHora" type="time" value="${esc(c.horario || '18:00')}" style="width:110px"></div>
-    </div>
-    <div class="dica" style="margin-top:8px">Exemplo: <span class="mono" id="pcEx"></span></div>
-    <p class="dica">Depois de mudar a pasta ou a organização, use <b>Regravar arquivos</b> para copiar os XML já baixados para a nova estrutura. O PDF ocupa mais espaço e consulta o Ambiente Nacional uma vez por nota.</p>`,
-    rodape: '<button class="btn" data-regravar style="margin-right:auto">Regravar arquivos</button><button class="btn" data-reproc>Reprocessar notas</button><button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Salvar</button>' });
-  const ex = () => { const sub = $('#pcSub', d.el).value.split('/').slice(1).map((x) => ({ ano: '2026', mes: '10', tipo: $('#pcEm', d.el).value })[x]).join('\\');
-    $('#pcEx', d.el).textContent = `${$('#pcPasta', d.el).value.replace(/\\+$/, '')}\\EMPRESA LTDA\\${sub}\\<chave>.xml`;
-    $('#pcHora', d.el).style.display = $('#pcFreq', d.el).value === 'diario' ? '' : 'none'; };
+  S.cfgConector = data ? { ...data.cfg, atualizado_em: data.atualizado_em } : null;
+  return S.cfgConector;
+}
+// Preferências (mesma organização do programa do PC: Arquivos XML · Download · Conector)
+ACOES.prefsConector = async (secao) => {
+  if (!['xml', 'download', 'conector'].includes(secao)) secao = 'xml';
+  const c = await carregarCfgConector();
+  if (!c && !conectorAqui()) throw new Error('O conector ainda não enviou as preferências. Ele envia ao conectar; se o conector for antigo, atualize-o pela aba Empresas no computador dos certificados.');
+  if (!c || conectorDesatualizado(c.versao)) exigirConectorNovo();
+  const d = dialogo({ titulo: 'Preferências', tamanho: 'lg', corpo: `<div class="prefs">
+    <nav>${[['xml', 'Arquivos XML'], ['download', 'Download'], ['conector', 'Conector']].map(([k, t]) => `<button data-sec="${k}" class="${secao === k ? 'on' : ''}">${t}</button>`).join('')}</nav>
+    <div class="prefs-corpo">
+      <section data-s="xml"><div class="secao" style="margin-top:0">Arquivos XML</div>
+        <div class="form" style="grid-template-columns:120px 1fr"><label>Pasta geral</label><input id="pcPasta" value="${esc(c.pasta_xml || '')}" placeholder="C:\\Gestius NFS-e\\XML">
+          <span></span><p class="dica" style="margin:0">Cada empresa ganha uma pasta dentro desta, com o nome do cadastro dela. A pasta fica no computador do conector${c.host ? ` (${esc(c.host)})` : ''}.</p></div>
+        <div class="secao">Organização</div>
+        <div class="form" style="grid-template-columns:120px 1fr 1fr"><label>Subpastas</label><select id="pcSub" style="grid-column:span 2">${opcoes(SUBPASTAS, c.subpastas)}</select>
+          <label>Emitidas</label><input id="pcEm" value="${esc(c.pasta_emitidas || 'Emitidas')}" maxlength="60"><span class="dica">Chave de acesso</span>
+          <label>Recebidas</label><input id="pcRe" value="${esc(c.pasta_recebidas || 'Recebidas')}" maxlength="60"><span class="dica">Chave de acesso</span>
+          <label>Eventos</label><input id="pcEv" value="${esc(c.pasta_eventos || 'Eventos')}" maxlength="60"><span class="dica">Chave do evento</span>
+          <label>Ano/mês pela</label><div style="grid-column:span 2" class="linha"><label class="chk"><input type="radio" name="pcAm" value="competencia" ${c.anomes_pela !== 'geracao' ? 'checked' : ''}> Data de competência</label>
+            <label class="chk"><input type="radio" name="pcAm" value="geracao" ${c.anomes_pela === 'geracao' ? 'checked' : ''}> Data de geração</label><span class="dica">Eventos: pela data do evento</span></div>
+          <label>Exemplo</label><pre class="mono exemplo" id="pcEx" style="grid-column:span 2"></pre></div>
+        <div class="secao">PDF (DANFSe)</div>
+        <label class="chk"><input type="checkbox" id="pcPdf" ${c.gravar_pdf === '1' ? 'checked' : ''}> Gravar também o PDF ao lado de cada XML de nota</label>
+        <p class="dica">Vale para as notas baixadas daqui em diante. Para as que já estão na pasta: aba Conector → "Regravar arquivos". O PDF ocupa mais espaço que o XML.</p></section>
+      <section data-s="download" hidden><div class="secao" style="margin-top:0">Baixar sozinho</div>
+        <div class="form" style="grid-template-columns:120px 220px"><label>Frequência</label><select id="pcFreq">${opcoes(FREQ, c.frequencia)}</select>
+          <label>Horário</label><input id="pcHora" type="time" value="${esc(c.horario || '18:00')}"></div>
+        <p class="dica">O conector baixa as notas de todas as empresas ativas sozinho, com o computador ligado. Com o computador desligado no horário, ele baixa assim que for ligado. "Sincronizar agora" (aba Empresas) baixa na hora, a qualquer momento.</p>
+        <p class="dica">Se outro sistema também consulta o Ambiente Nacional com o mesmo certificado, escolha um intervalo maior: os dois juntos podem passar do limite de acessos.</p></section>
+      <section data-s="conector" hidden><div class="secao" style="margin-top:0">Conector do escritório</div>
+        <div class="form" style="grid-template-columns:150px 1fr"><label>Computador</label><b>${esc(c.host || '—')}</b><label>Versão</label><span>${esc(c.versao || '—')} <span class="dica">(o site precisa da ${CONECTOR_MIN} ou mais nova)</span></span>
+          <label>Atualizado em</label><span>${fmtDH(c.atualizado_em)}</span></div>
+        <p class="dica">O conector confere sozinho, a cada 6 horas, se há versão nova e se atualiza sem precisar de nada.</p>
+        <div class="linha" style="flex-wrap:wrap;gap:8px"><button class="btn" data-atualizar>${ico('sync')} Procurar atualização agora</button><button class="btn" data-regravar>Regravar arquivos na pasta</button><button class="btn" data-reproc>Reprocessar notas</button></div>
+        <p class="dica"><b>Regravar arquivos:</b> grava de novo os XML (e PDFs já baixados) com a pasta e a organização atuais. <b>Reprocessar:</b> relê os XML guardados e corrige os valores mostrados no site.</p></section>
+    </div></div>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Salvar</button>' });
+  const mostrar = (k) => { $$('[data-sec]', d.el).forEach((b) => b.classList.toggle('on', b.dataset.sec === k)); $$('[data-s]', d.el).forEach((x) => (x.hidden = x.dataset.s !== k)); };
+  $$('[data-sec]', d.el).forEach((b) => (b.onclick = () => mostrar(b.dataset.sec))); mostrar(secao);
+  const ex = () => {
+    const sep = /^[a-zA-Z]:|^\\\\/.test($('#pcPasta', d.el).value) ? '\\' : '/', base = $('#pcPasta', d.el).value.replace(/[\\/]+$/, '');
+    const am = $('input[name=pcAm]:checked', d.el).value === 'geracao' ? ['2026', '10'] : ['2026', '09'];
+    const caminho = (tipo, ano, mes) => $('#pcSub', d.el).value.split('/').slice(1).map((x) => ({ ano, mes, tipo })[x]).join(sep);
+    $('#pcEx', d.el).textContent = [`${base}${sep}EMPRESA LTDA${sep}${caminho($('#pcEm', d.el).value, ...am)}${sep}42054001…000001230.xml`,
+      `${base}${sep}EMPRESA LTDA${sep}${caminho($('#pcRe', d.el).value, ...am)}${sep}42054001…000000770.xml`, `${base}${sep}EMPRESA LTDA${sep}${caminho($('#pcEv', d.el).value, '2026', '10')}${sep}42054001…101101001.xml`].join('\n');
+    $('#pcHora', d.el).disabled = $('#pcFreq', d.el).value !== 'diario';
+  };
   $$('input,select', d.el).forEach((i) => (i.oninput = i.onchange = ex)); ex();
   $('[data-ok]', d.el).onclick = tenta(async () => {
     const dados = { pasta_xml: $('#pcPasta', d.el).value.trim(), subpastas: $('#pcSub', d.el).value, pasta_emitidas: $('#pcEm', d.el).value, pasta_recebidas: $('#pcRe', d.el).value,
-      pasta_eventos: $('#pcEv', d.el).value, anomes_pela: $('#pcAm', d.el).value, gravar_pdf: $('#pcPdf', d.el).checked ? '1' : '0', frequencia: $('#pcFreq', d.el).value, horario: $('#pcHora', d.el).value };
-    if (!/^([a-zA-Z]:\\|\\\\)/.test(dados.pasta_xml)) throw new Error('Informe a pasta completa, como C:\\Gestius NFS-e\\XML.');
-    await comando('config', dados, 'Enviando as preferências ao conector…'); d.fechar(); toast('Preferências salvas no conector.', 'ok');
+      pasta_eventos: $('#pcEv', d.el).value, anomes_pela: $('input[name=pcAm]:checked', d.el).value, gravar_pdf: $('#pcPdf', d.el).checked ? '1' : '0', frequencia: $('#pcFreq', d.el).value, horario: $('#pcHora', d.el).value };
+    if (!dados.pasta_xml) throw new Error('Informe a pasta geral.');
+    const r = await comando('config', dados, 'Enviando as preferências ao conector…'); d.fechar();
+    toast('Preferências salvas no conector.', 'ok');
+    if (r.alteradas?.some((k) => ['pasta_xml', 'subpastas', 'pasta_emitidas', 'pasta_recebidas', 'pasta_eventos', 'anomes_pela'].includes(k)) && c.pasta_xml)
+      confirmar('Regravar os arquivos já baixados?', 'A pasta ou a organização mudou. Os XML já baixados continuam no lugar antigo; posso gravá-los também na nova estrutura.', 'Regravar',
+        tenta(async () => { const x = await comando('regravar', {}, 'Regravando os arquivos…'); toast(`${x.arquivos || 0} arquivo(s) gravados na pasta.`, 'ok'); }));
   });
+  $('[data-atualizar]', d.el).onclick = tenta(async () => { const r = await comando('atualizar', {}, 'Procurando atualização…'); toast(r.atualizado ? `Conector atualizado para a versão ${r.para}. Ele reinicia sozinho em alguns segundos.` : `O conector já está na versão mais nova (${r.versao}).`, 'ok'); });
   $('[data-regravar]', d.el).onclick = tenta(async () => { const r = await comando('regravar', {}, 'Regravando os arquivos na pasta…'); toast(`${r.arquivos || 0} arquivo(s) gravados na pasta${r.erros ? ` · ${r.erros} com erro` : ''}.`, r.erros ? 'erro' : 'ok'); });
   $('[data-reproc]', d.el).onclick = tenta(async () => { const r = await comando('reprocessar', {}, 'Relendo os XML guardados…'); toast(`${r.notas || 0} nota(s) relidas a partir do XML.`, 'ok'); });
 };
@@ -446,10 +494,10 @@ function vNotas() {
       <select id="nRet">${opcoes({ '': 'Com e sem ret., desc. e ded.', com: 'Com retenção, desconto ou dedução', sem: 'Sem retenção, desconto ou dedução' }, f.ret)}</select>
       <select id="nReg">${opcoes({ '': 'Todos os regimes', 1: 'Não optante', 2: 'Optante - MEI', 3: 'Optante - ME/EPP' }, f.regime)}</select>
       <input class="busca" id="nQ" placeholder="Procurar por número, nome, CNPJ, chave de acesso ou descrição do serviço" value="${esc(f.q)}">
-      <button class="btn pri" id="nFiltrar">${ico('filtro')} Filtrar</button><button class="btn" id="nLimpar">Limpar</button>
+      <button class="btn pri" id="nFiltrar">${ico('filtro')} Filtrar</button><button class="btn" id="nLimpar">Limpar</button><button class="btn" data-act="colunasN" style="margin-left:auto">${ico('colunas')} Colunas</button>
     </div>
     <div class="grade" id="gN"><div class="vazio">Carregando…</div></div>
-    <div class="rodape"><button class="btn" data-act="planilhaN">${ico('excel')} Planilha</button><button class="btn" data-act="relacaoN">${ico('pdf')} Relação</button>
+    <div class="rodape"><button class="btn" data-act="planilhaN">${ico('excel')} Planilha</button><button class="btn" data-act="relacaoN">${ico('pdf')} Relação</button><button class="btn" data-act="danfseLote">${ico('pdf')} DANFSe…</button>
       <button class="btn" data-act="zipN" ${conectorAqui() ? '' : 'title="Os XML e PDF ficam no computador do conector: abra o site nele para baixar o Zip."'}>${ico('zip')} Zip (XML e PDF)</button><span class="cont" id="nCont"></span></div>
     <div class="totais" id="nTot"></div>`;
   const ler = () => { Object.assign(f, { tipo: $('#nTipo').value, data: $('#nData').value, per: $('#nPer').value, ini: $('#nIni').value, fim: $('#nFim').value,
@@ -476,16 +524,32 @@ const COLN = [
   ['numero', 'NFS-e', (n) => esc(n.numero)], ['v_serv', 'Preço Serviço (R$)', (n) => brl(n.v_serv), null, 'num'],
   ['v_iss', 'ISS (R$)', (n) => brl(n.v_iss) + (n.iss_retido ? ' <span class="pill aviso" title="ISS retido">ret</span>' : ''), null, 'num'],
   ['situacao', 'Situação', (n) => `<span class="pill ${esc(n.situacao)}">${SITN[n.situacao] || esc(n.situacao)}</span>`, null, 'cen'],
+  // colunas opcionais (botão "Colunas")
+  ['cod_trib', 'cTribNac', (n) => esc(n.cod_trib || ''), null, '', true], ['c_nbs', 'NBS', (n) => esc(n.c_nbs || ''), null, '', true],
+  ['v_liq', 'Valor líquido (R$)', (n) => brl(n.v_liq), null, 'num', true], ['v_total_ret', 'Total retido (R$)', (n) => brl(n.v_total_ret), null, 'num', true],
+  ['v_ret_irrf', 'IRRF (R$)', (n) => brl(n.v_ret_irrf), null, 'num', true], ['v_ret_csll', 'CSLL (R$)', (n) => brl(n.v_ret_csll), null, 'num', true],
+  ['v_ret_cp', 'INSS/CP (R$)', (n) => brl(n.v_ret_cp), null, 'num', true], ['v_pis', 'PIS (R$)', (n) => brl(n.v_pis), null, 'num', true], ['v_cofins', 'COFINS (R$)', (n) => brl(n.v_cofins), null, 'num', true],
+  ['v_cbs', 'CBS (R$)', (n) => brl(n.v_cbs), null, 'num', true], ['v_ibs_mun', 'IBS Mun. (R$)', (n) => brl((n.v_ibs_mun || 0)), null, 'num', true],
+  ['p_aliq', 'Alíq. ISS', (n) => (n.p_aliq ? esc(String(n.p_aliq).replace('.', ',')) + '%' : ''), null, 'num', true], ['chave', 'Chave de acesso', (n) => `<span class="mono" style="font-size:11px">${esc(n.chave)}</span>`, null, '', true],
 ];
+const colsVisiveis = () => { const v = guardado('colsN', null); return COLN.filter((c) => (v ? v.includes(c[0]) : !c[5])); };
+ACOES.colunasN = () => {
+  const vis = colsVisiveis().map((c) => c[0]);
+  const d = dialogo({ titulo: 'Colunas', tamanho: 'sm', corpo: `<div class="cols-lista">${COLN.map((c) => `<label class="chk"><input type="checkbox" data-col="${c[0]}" ${vis.includes(c[0]) ? 'checked' : ''}> ${c[1]}</label>`).join('')}</div>`,
+    rodape: '<button class="btn" data-padrao style="margin-right:auto">Padrão</button><button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>OK</button>' });
+  $('[data-padrao]', d.el).onclick = () => { guardar('colsN', null); d.fechar(); desenharNotas(); };
+  $('[data-ok]', d.el).onclick = () => { const sel = $$('[data-col]', d.el).filter((x) => x.checked).map((x) => x.dataset.col); if (!sel.length) return; guardar('colsN', sel); d.fechar(); desenharNotas(); };
+};
 function desenharNotas() {
   const g = $('#gN'), N = S.notas; if (!g || !N) return;
-  const tipo = S.fN.tipo, cols = COLN.filter((c) => !c[3] || tipo === 'todas' || c[3] === tipo);
+  const tipo = S.fN.tipo, cols = colsVisiveis().filter((c) => !c[3] || tipo === 'todas' || c[3] === tipo);
   const { c: oc, d: od } = S.ordN;
   const linhas = [...N.linhas].sort((a, b) => { const x = a[oc] ?? '', y = b[oc] ?? ''; return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true })) * od; });
   g.innerHTML = linhas.length ? `<table><thead><tr>${cols.map(([k, t, , , cl]) => `<th data-ord="${k}" class="${cl || ''}">${t}${oc === k ? `<span class="ord">${od > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}${conectorAqui() ? '<th class="cen" style="width:76px">PDF/XML</th>' : ''}</tr></thead>
     <tbody>${linhas.map((n) => `<tr data-i="${N.linhas.indexOf(n)}">${cols.map(([, , fn, , cl]) => `<td class="${cl || ''}">${fn(n)}</td>`).join('')}${conectorAqui() ? `<td><div class="docbtns"><button data-pdf title="DANFSe (PDF)">${ico('pdf')}</button><button data-xml title="Baixar XML">${ico('xml')}</button></div></td>` : ''}</tr>`).join('')}</tbody></table>`
     : `<div class="vazio">${S.empresas.length ? 'Nenhuma nota no período.' : 'Nenhuma empresa publicada ainda pelo programa do PC.'}</div>`;
   $$('th[data-ord]', g).forEach((th) => (th.onclick = () => { const k = th.dataset.ord; S.ordN = { c: k, d: S.ordN.c === k ? -S.ordN.d : 1 }; guardar('ordN', S.ordN); desenharNotas(); }));
+  $$('tbody tr', g).forEach((tr) => (tr.oncontextmenu = (ev) => { $$('tbody tr', g).forEach((x) => x.classList.toggle('sel', x === tr)); menuNota(ev, N.linhas[tr.dataset.i]); }));
   $$('tbody tr', g).forEach((tr) => { tr.onclick = (ev) => { if (ev.target.closest('.docbtns')) return; $$('tbody tr', g).forEach((x) => x.classList.toggle('sel', x === tr)); }; tr.ondblclick = (ev) => { if (!ev.target.closest('.docbtns')) detalheNota(N.linhas[tr.dataset.i]); }; });
   $$('[data-pdf],[data-xml]', g).forEach((b) => (b.onclick = tenta(async () => { const n = N.linhas[b.closest('tr').dataset.i]; await baixarDoConector(n, b.hasAttribute('data-pdf') ? 'pdf' : 'xml'); })));
   const t = N.totais;
@@ -616,6 +680,7 @@ const carregarEventos = tenta(async () => {
 const nomeEmp = (doc) => (S.empresas.find((e) => e.doc === doc) || {}).nome || fmtDoc(doc);
 ACOES.zipN = async () => {
   if (!conectorAqui()) throw new Error('Os XML e PDF ficam no computador do conector. Abra o site nele para baixar o Zip (ou use a pasta dos XML desse computador).');
+  exigirConectorNovo();
   if (!S.notas?.totais.total) throw new Error('Nenhuma nota no filtro.');
   const tipo = S.fN.tipo, z = guardado('zipOp', { emitidas: true, recebidas: true, eventos: true, pdf: false, subpastas: true });
   const d = dialogo({ titulo: 'Zip com os arquivos', tamanho: 'sm', corpo: `<div class="dica">${fmtD(S.fN.ini)} a ${fmtD(S.fN.fim)} · ${S.empresaSel === 'todas' ? 'todas as empresas' : esc(nomeEmp(S.empresaSel))} · filtro atual</div>
@@ -679,6 +744,74 @@ function htmlRelacao(linhas, porEmp) {
     .quebra{page-break-before:always} @page{size:A4 landscape;margin:12mm}</style></head><body>
     ${[...grupos.entries()].map(([k, l], i) => `<div class="${i ? 'quebra' : ''}"><h1>Relação de NFS-e</h1><div class="cab">${cab}</div><h2>${k === 'todas' ? 'Todas as empresas' : `${fmtDoc(k)} - ${esc(nomeEmp(k))}`}</h2>${tabela(l)}</div>`).join('')}
     <p style="color:#777;margin-top:10px">Gerado pelo Gestius NFS-e a partir das notas do Ambiente Nacional. Notas canceladas/substituídas aparecem riscadas e não entram nos totais.</p></body></html>`;
+}
+
+ACOES.danfseLote = async () => {
+  if (!conectorAqui()) throw new Error('Os PDFs ficam no computador do conector. Abra o site nele para gerar o DANFSe em lote.');
+  exigirConectorNovo();
+  if (!S.notas?.totais.total) throw new Error('Nenhuma nota no filtro.');
+  const d = dialogo({ titulo: 'DANFSe em lote', tamanho: 'sm', corpo: `<div class="dica">${fmtD(S.fN.ini)} a ${fmtD(S.fN.fim)} · ${S.empresaSel === 'todas' ? 'todas as empresas' : esc(nomeEmp(S.empresaSel))} · ${S.notas.totais.total} nota(s), uma por página</div>
+    <div style="margin:12px 0 6px">Arquivos:</div>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="radio" name="dOrg" value="emp" checked> Um arquivo por empresa</label>
+    <label class="chk" style="display:flex;margin:6px 0"><input type="radio" name="dOrg" value="um"> Um arquivo só</label>
+    <p class="dica">Os DANFSe que ainda não foram baixados são buscados no Ambiente Nacional agora (pode demorar alguns minutos).</p>`,
+    rodape: '<button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-ok>Gerar…</button>' });
+  $('[data-ok]', d.el).onclick = tenta(async () => {
+    const umPorEmpresa = $('input[name=dOrg]:checked', d.el).value === 'emp'; d.fechar();
+    const r = ok(await sb.rpc('consultar_notas', { p: filtroAtual({ limite: 3000 }) }));
+    toast(`Gerando o DANFSe de ${r.linhas.length} nota(s)…`);
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await chamarConector('/ponte/danfse-lote', { method: 'POST', tempo: 900000, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ itens: r.linhas.map((n) => ({ doc: n.empresa_doc, chave: n.chave })), umPorEmpresa }) });
+    const tipo = resp.headers.get('content-type') || '', nome = /filename="?([^";]+)/.exec(resp.headers.get('content-disposition') || '')?.[1] || (tipo.includes('pdf') ? 'DANFSe.pdf' : 'DANFSe.zip');
+    salvarArquivo(await resp.arrayBuffer(), decodeURIComponent(nome), tipo.includes('pdf') ? 'application/pdf' : 'application/zip');
+  });
+};
+
+// menu do botão direito (como no programa do PC)
+function menuContexto(ev, itens) {
+  ev.preventDefault();
+  $$('.ctx').forEach((x) => x.remove());
+  const m = document.createElement('div'); m.className = 'ctx';
+  m.innerHTML = itens.map((it) => (it === '-' ? '<hr>' : `<button ${it.off ? 'disabled' : ''} title="${esc(it.dica || '')}">${it.ico ? ico(it.ico) : '<i class="ico-vazio"></i>'}${esc(it.t)}</button>`)).join('');
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.min(ev.clientX, innerWidth - r.width - 8) + 'px'; m.style.top = Math.min(ev.clientY, innerHeight - r.height - 8) + 'px';
+  const fns = itens.filter((it) => it !== '-');
+  $$('button', m).forEach((b, i) => (b.onclick = () => { m.remove(); tenta(fns[i].fn)(); }));
+  setTimeout(() => { const fechar = (e) => { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('mousedown', fechar); } }; document.addEventListener('mousedown', fechar); }, 0);
+}
+async function salvarDoConector(n, tipos) {
+  const { data: { session } } = await sb.auth.getSession();
+  for (const tipo of tipos) {
+    const r = await chamarConector(`/ponte/arquivo?doc=${n.empresa_doc}&chave=${n.chave}&tipo=${tipo}`, { headers: { Authorization: 'Bearer ' + session.access_token } });
+    salvarArquivo(await r.arrayBuffer(), `${n.chave}.${tipo}`, tipo === 'pdf' ? 'application/pdf' : 'application/xml');
+  }
+}
+function menuNota(ev, n) {
+  const aqui = conectorAqui(), dica = aqui ? '' : 'Os arquivos ficam no computador do conector';
+  menuContexto(ev, [
+    { t: 'Ver XML', ico: 'xml', off: !aqui, dica, fn: () => baixarDoConector(n, 'xml') },
+    { t: 'Ver DANFSe', ico: 'pdf', off: !aqui, dica, fn: () => baixarDoConector(n, 'pdf') }, '-',
+    { t: 'Salvar XML como…', off: !aqui, dica, fn: () => salvarDoConector(n, ['xml']) },
+    { t: 'Salvar DANFSe como…', off: !aqui, dica, fn: () => salvarDoConector(n, ['pdf']) },
+    { t: 'Salvar DANFSe e XML', off: !aqui, dica, fn: () => salvarDoConector(n, ['pdf', 'xml']) }, '-',
+    { t: 'Copiar chave de acesso', fn: async () => { await navigator.clipboard.writeText(n.chave); toast('Chave copiada.', 'ok'); } },
+    { t: 'Ver eventos desta nota', ico: 'eventos', fn: () => { S.fE = { ...(S.fE || {}), q: n.chave, per: 'livre', ini: '2020-01-01', fim: new Date().toLocaleDateString('sv-SE') }; irPara('eventos'); } },
+    { t: 'Detalhes da nota', fn: () => detalheNota(n) },
+  ]);
+}
+function menuEmpresa(ev, e) {
+  const aqui = conectorAqui();
+  menuContexto(ev, [
+    { t: 'Sincronizar só esta empresa', ico: 'sync', fn: async () => { const r = await comando('sync', { docs: [e.doc] }, 'Pedindo a sincronização…'); toast(r.enfileiradas ? 'Sincronizando. As notas novas aparecem em instantes.' : 'Já estava sincronizando.', 'ok'); atualizarDepois(); } },
+    { t: 'Ver notas desta empresa', ico: 'notas', fn: () => { S.empresaSel = e.doc; guardar('empresaSelWeb', S.empresaSel); carregarEmpresas(); irPara('notas'); } },
+    { t: 'Abrir pasta da empresa', ico: 'pasta', off: !aqui, dica: aqui ? '' : 'Só no computador do conector', fn: () => abrirPastaConector(e.doc) },
+    { t: 'Histórico desta empresa', fn: () => ACOES.historico(e.doc) }, '-',
+    { t: e.ativo ? 'Desativar' : 'Ativar', fn: async () => { await comando('ativar_empresa', { doc: e.doc, ativo: !e.ativo }); toast(e.ativo ? 'Empresa desativada.' : 'Empresa ativada.', 'ok'); atualizarDepois(3000); } },
+    { t: 'Excluir empresa…', ico: 'lixo', fn: () => confirmar(`Excluir ${e.nome}?`, 'A empresa e as notas dela saem do site e do conector. Antes, o conector guarda um zip com os XML na pasta de dados dele.', 'Excluir',
+      tenta(async () => { await comando('excluir_empresa', { doc: e.doc }); toast('Empresa excluída.', 'ok'); atualizarDepois(3000); })) },
+  ]);
 }
 
 // ---------------- Conferir ----------------
@@ -955,8 +1088,10 @@ function pedirTexto(titulo, rotulo, valor, fn) {
 }
 
 // ---------------- histórico, menu ----------------
-ACOES.historico = async () => {
-  const h = ok(await sb.from('sincronizacoes').select('*').eq('escritorio_id', S.esc).order('inicio', { ascending: false }).limit(200));
+ACOES.historico = async (doc) => {
+  let q = sb.from('sincronizacoes').select('*').eq('escritorio_id', S.esc).order('inicio', { ascending: false }).limit(200);
+  if (typeof doc === 'string' && doc) q = q.eq('empresa_doc', doc);
+  const h = ok(await q);
   const st = { ok: 'ok', aviso: 'aviso', erro: 'erro', rodando: 'info' };
   dialogo({ titulo: 'Histórico de sincronização', tamanho: 'lg', rodape: '<button class="btn pri" data-fechar>Fechar</button>',
     corpo: h.length ? `<table class="hist"><thead><tr><th style="text-align:left">Início</th><th style="text-align:left">Empresa</th><th>Situação</th><th class="num">Novas</th><th style="text-align:left">Mensagem</th></tr></thead><tbody>
@@ -968,11 +1103,12 @@ ACOES.menuUsuario = (el) => {
   const r = el.getBoundingClientRect(), m = document.createElement('div'); m.className = 'menu';
   m.style.top = r.bottom + 4 + 'px'; m.style.right = innerWidth - r.right + 'px';
   m.innerHTML = `<div style="padding:6px 14px 8px"><b>${esc(S.membros.find((x) => x.escritorio_id === S.esc)?.nome || '')}</b><div class="dica">${esc(S.user.email)} · operador${S.superu ? ' · administrador do site' : ''}</div></div><hr>
-    <button data-m="dados">Meus dados</button><button data-m="senha">Trocar minha senha</button><button data-m="sair">Sair</button>`;
+    <button data-m="prefs">Preferências…</button><button data-m="dados">Meus dados</button><button data-m="senha">Trocar minha senha</button><button data-m="sair">Sair</button>`;
   document.body.appendChild(m);
   setTimeout(() => document.addEventListener('click', function f(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('click', f); } }), 0);
   $('[data-m=sair]', m).onclick = () => ACOES.sair();
   $('[data-m=dados]', m).onclick = () => { m.remove(); ACOES.meusDados(); };
+  $('[data-m=prefs]', m).onclick = () => { m.remove(); tenta(ACOES.prefsConector)(); };
   $('[data-m=senha]', m).onclick = () => { m.remove(); telaLogin('novasenha'); };
 };
 ACOES.sair = async () => { await sb.auth.signOut(); location.reload(); };

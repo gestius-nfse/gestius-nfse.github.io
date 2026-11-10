@@ -313,3 +313,18 @@ a.x-mini:hover{color:#c5221f}
 .ok-ico{color:#1e8e3e;width:14px;height:14px;vertical-align:-2px}
 .form{display:grid;gap:8px 12px;align-items:center}
 .form .linha{display:flex;gap:8px;align-items:center}
+
+/* ---------- 3.6: menu do botão direito, preferências, colunas ---------- */
+.ctx{position:fixed;z-index:1000;background:#fff;border:1px solid #cfd3da;border-radius:6px;box-shadow:0 8px 24px rgba(15,44,72,.18);padding:4px;min-width:230px}
+.ctx button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;text-align:left;padding:6px 10px;border-radius:4px;cursor:pointer;font:inherit;font-size:12.5px;color:#1c2430}
+.ctx button:hover:not(:disabled){background:#eef2f7}
+.ctx button:disabled{color:#a3a9b3;cursor:default}
+.ctx button svg,.ctx .ico-vazio{width:15px;height:15px;flex:none;display:inline-block}
+.ctx hr{border:0;border-top:1px solid #e6e8ec;margin:4px 2px}
+.prefs{display:grid;grid-template-columns:160px 1fr;min-height:430px;margin:-14px -18px}
+.prefs nav{background:#f6f7f9;border-right:1px solid var(--line);padding:8px 0}
+.prefs nav button{display:block;width:100%;border:0;background:none;text-align:left;padding:9px 16px;cursor:pointer;font:inherit;color:#1c2430}
+.prefs nav button.on{background:var(--navy);color:#fff}
+.prefs-corpo{padding:14px 18px;overflow:auto;max-height:66vh}
+.prefs .exemplo{margin:0;font-size:11px;color:#667;background:#f6f7f9;border:1px solid var(--line);border-radius:4px;padding:6px 8px;white-space:pre;overflow:auto}
+.cols-lista{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
